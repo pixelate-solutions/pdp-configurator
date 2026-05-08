@@ -30,7 +30,7 @@ export function AdminSlotEditor({
   ];
 
   return (
-    <form action={upsertSlotAction} className="rounded-lg border border-border bg-white p-4 shadow-sm">
+    <form action={upsertSlotAction} className="liquid-surface rounded-3xl p-4">
       <input type="hidden" name="id" value={slot?.id ?? ""} />
       <input type="hidden" name="frameId" value={frame.id} />
       <div className="grid gap-3 sm:grid-cols-2">
@@ -48,7 +48,7 @@ export function AdminSlotEditor({
           </div>
         ))}
       </div>
-      <label className="mt-4 flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold">
+      <label className="pressable mt-4 flex min-h-11 items-center gap-2 rounded-2xl border border-white/70 bg-white/58 px-3 text-sm font-semibold backdrop-blur">
         <input name="isActive" type="checkbox" defaultChecked={slot?.isActive ?? true} />
         Active
       </label>

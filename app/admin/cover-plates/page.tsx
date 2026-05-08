@@ -52,7 +52,7 @@ export default async function AdminCoverPlatesPage() {
         <h2 className="mb-3 text-xl font-semibold">Edit cover plates</h2>
         <div className="grid gap-3">
           {coverPlates.map((coverPlate) => (
-            <details key={coverPlate.id} className="rounded-lg border border-border bg-white p-4">
+            <details key={coverPlate.id} className="liquid-surface rounded-3xl p-4">
               <summary className="cursor-pointer font-semibold">
                 {coverPlate.slotType} • {coverPlate.catalogNumber}
               </summary>

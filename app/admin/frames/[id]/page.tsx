@@ -57,7 +57,7 @@ export default async function AdminFrameDetailPage({
         <h2 className="mb-3 text-xl font-semibold">Edit slots</h2>
         <div className="grid gap-3">
           {slots.map((slot) => (
-            <details key={slot.id} className="rounded-lg border border-border bg-white p-4">
+            <details key={slot.id} className="liquid-surface rounded-3xl p-4">
               <summary className="cursor-pointer font-semibold">
                 {slot.label} • circuits {slot.circuitNumbers}
               </summary>

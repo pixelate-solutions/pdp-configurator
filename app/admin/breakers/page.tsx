@@ -53,7 +53,7 @@ export default async function AdminBreakersPage() {
         <h2 className="mb-3 text-xl font-semibold">Edit breaker options</h2>
         <div className="grid gap-3">
           {breakerOptions.map((breaker) => (
-            <details key={breaker.id} className="rounded-lg border border-border bg-white p-4">
+            <details key={breaker.id} className="liquid-surface rounded-3xl p-4">
               <summary className="cursor-pointer font-semibold">
                 {breaker.family} {breaker.amps}A • {breaker.catalogNumber}
               </summary>

@@ -1,20 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f6f4;
-  --foreground: #1a1a1a;
-  --card: #ffffff;
-  --muted: #efede9;
-  --muted-foreground: #6b6560;
-  --border: #e2e0dc;
-  --primary: rgb(30,72,126);
+  --background: #f5f8fb;
+  --foreground: #17202c;
+  --card: rgba(255, 255, 255, 0.78);
+  --muted: #eaf0f5;
+  --muted-foreground: #5f6c79;
+  --border: rgba(127, 146, 164, 0.28);
+  --primary: rgb(26, 83, 141);
   --primary-foreground: #f8fafc;
-  --accent: #dcaa00;
+  --accent: #f2b705;
   --danger: #c2410c;
-  --blue-dark: rgb(30,72,126);
-  --blue-light: rgb(30,72,126);
-  --green: oklch(0.52 0.14 142);
-  --green-bg: oklch(0.96 0.04 142);
+  --blue-dark: rgb(20, 64, 118);
+  --blue-light: rgb(43, 129, 191);
+  --green: oklch(0.55 0.15 155);
+  --green-bg: rgba(226, 249, 238, 0.82);
+  --glass: rgba(255, 255, 255, 0.68);
+  --glass-strong: rgba(255, 255, 255, 0.86);
+  --glass-border: rgba(255, 255, 255, 0.62);
+  --ring-glow: rgba(43, 129, 191, 0.2);
+  --shadow-soft: 0 18px 60px rgba(24, 48, 74, 0.13), 0 4px 18px rgba(24, 48, 74, 0.08);
+  --shadow-hover: 0 24px 70px rgba(24, 48, 74, 0.18), 0 10px 28px rgba(24, 48, 74, 0.1);
 }
 
 @theme inline {
@@ -38,6 +44,7 @@
 html {
   min-height: 100%;
   background: var(--background);
+  scroll-behavior: smooth;
 }
 
 body {
@@ -45,8 +52,11 @@ body {
   min-height: 100%;
   margin: 0;
   color: var(--foreground);
-  background: var(--background);
+  background:
+    linear-gradient(120deg, rgba(242, 183, 5, 0.09), transparent 30%),
+    linear-gradient(180deg, #eef6fb 0%, #f7f9fc 40%, #f6f8fb 100%);
   font-family: Arial, Helvetica, sans-serif;
+  text-rendering: geometricPrecision;
 }
 
 button,
@@ -56,8 +66,147 @@ textarea {
   font: inherit;
 }
 
+::selection {
+  background: rgba(43, 129, 191, 0.2);
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background-image:
+    linear-gradient(rgba(26, 83, 141, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(26, 83, 141, 0.055) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.78), transparent 78%);
+}
+
+:where(button, a, input, textarea, summary) {
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:where(input, textarea) {
+  caret-color: var(--primary);
+}
+
 .tap-highlight {
   -webkit-tap-highlight-color: transparent;
+}
+
+.glass-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.66)),
+    var(--glass);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(22px) saturate(1.2);
+}
+
+.glass-panel::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.68), transparent 34%),
+    linear-gradient(315deg, rgba(43, 129, 191, 0.1), transparent 42%);
+  opacity: 0.78;
+}
+
+.glass-panel > * {
+  position: relative;
+}
+
+.liquid-surface {
+  border: 1px solid var(--glass-border);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.62)),
+    var(--glass);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px) saturate(1.16);
+}
+
+.lift-hover {
+  transform: translateY(0) scale(1);
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.lift-hover:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: var(--shadow-hover);
+}
+
+.pressable {
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pressable:hover {
+  transform: translateY(-1px);
+}
+
+.pressable:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.soft-progress {
+  background: linear-gradient(90deg, var(--primary), var(--blue-light), var(--accent));
+  box-shadow: 0 0 18px rgba(43, 129, 191, 0.28);
+}
+
+.scroll-rise {
+  animation: rise-in 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@supports (animation-timeline: view()) {
+  .scroll-rise,
+  main :where(section, article, details, form) {
+    animation: rise-in both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 24%;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    filter: blur(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .lift-hover:hover,
+  .pressable:hover,
+  .pressable:active {
+    transform: none;
+  }
 }
 
 @media print {
@@ -67,5 +216,10 @@ textarea {
 
   body {
     background: white;
+  }
+
+  body::before,
+  .glass-panel::before {
+    display: none;
   }
 }

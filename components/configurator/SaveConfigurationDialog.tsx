@@ -99,7 +99,7 @@ export function SaveConfigurationDialog({
             />
           </div>
           {message ? (
-            <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+            <p className="rounded-2xl border border-white/70 bg-white/58 p-3 text-sm text-muted-foreground backdrop-blur">
               {message}
             </p>
           ) : null}

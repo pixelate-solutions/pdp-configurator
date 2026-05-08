@@ -165,86 +165,98 @@ export async function getSavedConfiguration(id: string) {
   const db = getDb();
   if (!db) return null;
 
-  const [configuration] = await db
-    .select()
-    .from(configurations)
-    .where(eq(configurations.id, id))
-    .limit(1);
+  try {
+    const [configuration] = await db
+      .select()
+      .from(configurations)
+      .where(eq(configurations.id, id))
+      .limit(1);
 
-  if (!configuration) return null;
+    if (!configuration) return null;
 
-  const data = await getConfiguratorData(configuration.frameId);
-  const items = await db
-    .select()
-    .from(configurationItems)
-    .where(eq(configurationItems.configurationId, configuration.id));
-  const selections: SlotSelection = createDefaultSelections(data);
+    const data = await getConfiguratorData(configuration.frameId);
+    const items = await db
+      .select()
+      .from(configurationItems)
+      .where(eq(configurationItems.configurationId, configuration.id));
+    const selections: SlotSelection = createDefaultSelections(data);
 
-  for (const item of items) {
-    if (item.slotId && item.breakerOptionId) {
-      selections[item.slotId] = item.breakerOptionId;
+    for (const item of items) {
+      if (item.slotId && item.breakerOptionId) {
+        selections[item.slotId] = item.breakerOptionId;
+      }
     }
-  }
 
-  return { configuration, data, selections, items };
+    return { configuration, data, selections, items };
+  } catch (error) {
+    console.error("Unable to load saved configuration:", error);
+    return null;
+  }
+}
+
+function getFallbackAdminCatalog(defaultMargin: number) {
+  return {
+    frames: seededFrames.map((frame) => ({
+      ...frame,
+      baseSellPrice: sellPriceFromCost(frame.baseCost, defaultMargin),
+    })),
+    slots: allSeededSlots,
+    breakerOptions: seededBreakerOptions.map((breaker) => ({
+      ...breaker,
+      sellPrice: sellPriceFromCost(breaker.cost, defaultMargin),
+    })),
+    coverPlates: seededCoverPlates.map((plate) => ({
+      ...plate,
+      sellPrice: sellPriceFromCost(plate.cost, defaultMargin),
+    })),
+    accessories: seededAccessories.map((accessory) => ({
+      ...accessory,
+      sellPrice: sellPriceFromCost(accessory.cost, defaultMargin),
+    })),
+    configurations: [],
+    defaultMargin,
+  };
 }
 
 export async function getAdminCatalog() {
   const db = getDb();
   const defaultMargin = await getPricingMargin();
-  if (!db) {
+  if (!db) return getFallbackAdminCatalog(defaultMargin);
+
+  try {
+    const [frames, slots, breakers, plates, allAccessories, savedConfigurations] =
+      await Promise.all([
+        db.select().from(panelboardFrames).orderBy(asc(panelboardFrames.name)),
+        db.select().from(panelboardSlots).orderBy(asc(panelboardSlots.displayOrder)),
+        db.select().from(breakerOptions).orderBy(asc(breakerOptions.family), asc(breakerOptions.amps)),
+        db.select().from(coverPlates).orderBy(asc(coverPlates.slotType)),
+        db.select().from(accessories).orderBy(asc(accessories.name)),
+        db.select().from(configurations).orderBy(asc(configurations.createdAt)),
+      ]);
+
     return {
-      frames: seededFrames.map((frame) => ({
+      frames: frames.map((frame) => ({
         ...frame,
         baseSellPrice: sellPriceFromCost(frame.baseCost, defaultMargin),
       })),
-      slots: allSeededSlots,
-      breakerOptions: seededBreakerOptions.map((breaker) => ({
+      slots,
+      breakerOptions: breakers.map((breaker) => ({
         ...breaker,
         sellPrice: sellPriceFromCost(breaker.cost, defaultMargin),
       })),
-      coverPlates: seededCoverPlates.map((plate) => ({
+      coverPlates: plates.map((plate) => ({
         ...plate,
         sellPrice: sellPriceFromCost(plate.cost, defaultMargin),
       })),
-      accessories: seededAccessories.map((accessory) => ({
+      accessories: allAccessories.map((accessory) => ({
         ...accessory,
         sellPrice: sellPriceFromCost(accessory.cost, defaultMargin),
       })),
-      configurations: [],
+      configurations: savedConfigurations,
       defaultMargin,
     };
+  } catch (error) {
+    console.error("Falling back to seeded admin catalog:", error);
+    return getFallbackAdminCatalog(defaultMargin);
   }
-
-  const [frames, slots, breakers, plates, allAccessories, savedConfigurations] =
-    await Promise.all([
-      db.select().from(panelboardFrames).orderBy(asc(panelboardFrames.name)),
-      db.select().from(panelboardSlots).orderBy(asc(panelboardSlots.displayOrder)),
-      db.select().from(breakerOptions).orderBy(asc(breakerOptions.family), asc(breakerOptions.amps)),
-      db.select().from(coverPlates).orderBy(asc(coverPlates.slotType)),
-      db.select().from(accessories).orderBy(asc(accessories.name)),
-      db.select().from(configurations).orderBy(asc(configurations.createdAt)),
-    ]);
-
-  return {
-    frames: frames.map((frame) => ({
-      ...frame,
-      baseSellPrice: sellPriceFromCost(frame.baseCost, defaultMargin),
-    })),
-    slots,
-    breakerOptions: breakers.map((breaker) => ({
-      ...breaker,
-      sellPrice: sellPriceFromCost(breaker.cost, defaultMargin),
-    })),
-    coverPlates: plates.map((plate) => ({
-      ...plate,
-      sellPrice: sellPriceFromCost(plate.cost, defaultMargin),
-    })),
-    accessories: allAccessories.map((accessory) => ({
-      ...accessory,
-      sellPrice: sellPriceFromCost(accessory.cost, defaultMargin),
-    })),
-    configurations: savedConfigurations,
-    defaultMargin,
-  };
 }

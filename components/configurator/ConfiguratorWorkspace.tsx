@@ -227,9 +227,9 @@ export function ConfiguratorWorkspace({
         key={step}
         type="button"
         onClick={() => goToStep(step)}
-        className={`flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 px-1.5 py-2 text-[11px] transition hover:cursor-pointer sm:gap-2 sm:px-4 sm:py-3 sm:text-[13px] ${
+        className={`pressable flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full px-1.5 py-2 text-[11px] transition hover:cursor-pointer sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[13px] ${
           active
-            ? "text-white"
+            ? "bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
             : done
               ? "text-white/70 hover:text-white"
               : "text-white/45 hover:text-white/70"
@@ -254,7 +254,7 @@ export function ConfiguratorWorkspace({
 
   return (
     <main className="min-h-screen pb-24 md:pb-0">
-      <nav className="sticky top-14 z-20 flex w-full items-stretch bg-[var(--blue-dark)] px-1 shadow-[0_2px_8px_rgba(0,0,0,0.16)] sm:px-6 no-print">
+      <nav className="no-print sticky top-14 z-20 flex w-full items-center gap-1 border-b border-white/12 bg-[rgba(20,64,118,0.84)] px-1.5 py-1.5 shadow-[0_10px_28px_rgba(20,64,118,0.18)] backdrop-blur-xl sm:px-6">
         {stepTab("frame", "Select Frame", "Frame", 1)}
         <span className="flex shrink-0 items-center px-0.5 text-sm text-white/20 sm:px-0 sm:text-lg">›</span>
         {stepTab("breakers", "Configure Breakers", "Breakers", 2)}
@@ -275,8 +275,8 @@ export function ConfiguratorWorkspace({
 
         {activeStep === "breakers" && !breakerStarted ? (
           <section className="flex min-h-[60vh] items-center justify-center px-1 py-8">
-            <div className="grid w-full max-w-[700px] items-center gap-8 rounded-xl border border-border bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.14)] sm:p-10 md:grid-cols-[160px_1fr]">
-              <div className="mx-auto rounded-lg bg-[#2a2a2a] p-4">
+            <div className="glass-panel scroll-rise grid w-full max-w-[760px] items-center gap-8 rounded-[2rem] p-6 sm:p-10 md:grid-cols-[170px_1fr]">
+              <div className="mx-auto rounded-[1.75rem] bg-[#1f2933] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_18px_38px_rgba(24,48,74,0.18)]">
                 <svg viewBox="0 0 320 900" className="block h-auto w-[120px]">
                   <rect x="0" y="0" width="320" height="900" fill="#e8e6e2" />
                   <rect x="8" y="8" width="304" height="884" fill="#d4d1cc" />
@@ -348,7 +348,7 @@ export function ConfiguratorWorkspace({
             <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
               <div className="lg:sticky lg:top-28 lg:self-start">
                 <div className="grid content-start items-start gap-3">
-                <div className="rounded-[6px] border border-border bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)]">
+                <div className="liquid-surface rounded-3xl p-4">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="min-w-0">
                       <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
@@ -373,9 +373,9 @@ export function ConfiguratorWorkspace({
                         <span>{filledCount} of {data.slots.length} assigned</span>
                         <span>{progressPct}%</span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded bg-border">
+                      <div className="h-2 overflow-hidden rounded-full bg-primary/10">
                         <div
-                          className="h-full rounded bg-primary transition-all"
+                          className="soft-progress h-full rounded-full transition-all duration-500"
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>
@@ -387,9 +387,9 @@ export function ConfiguratorWorkspace({
                           {Math.min(100, Math.round((selectedAmpTotal / data.selectedFrame.mainBusAmps) * 100))}%
                         </span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded bg-border">
+                      <div className="h-2 overflow-hidden rounded-full bg-primary/10">
                         <div
-                          className="h-full rounded bg-primary transition-all"
+                          className="soft-progress h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${Math.min(100, Math.round((selectedAmpTotal / data.selectedFrame.mainBusAmps) * 100))}%`,
                           }}
@@ -404,7 +404,7 @@ export function ConfiguratorWorkspace({
                         type="button"
                         title={slot.circuitNumbers}
                         onClick={() => walkTo(index)}
-                        className={`h-2.5 min-w-4 flex-1 cursor-pointer rounded-full transition hover:cursor-pointer hover:bg-accent ${
+                        className={`pressable h-3 min-w-4 flex-1 cursor-pointer rounded-full transition hover:cursor-pointer hover:bg-accent ${
                           index === walkIndex
                             ? "bg-accent"
                             : selections[slot.id]
@@ -420,7 +420,7 @@ export function ConfiguratorWorkspace({
                     <Button
                       type="button"
                       variant="secondary"
-                      className="pointer-events-auto size-10 bg-white/95 p-2 shadow-md"
+                      className="pointer-events-auto size-11 bg-white/88 p-2 shadow-[0_12px_28px_rgba(24,48,74,0.18)] backdrop-blur"
                       aria-label={previewMode ? "Minimize panel preview" : "Maximize panel preview"}
                       title={previewMode ? "Back to Slot" : "Preview Full Panel"}
                       onClick={() => setPreviewMode((current) => !current)}
@@ -443,7 +443,7 @@ export function ConfiguratorWorkspace({
                   />
                 </div>
                 {completed ? (
-                  <div className="rounded-[6px] bg-[rgba(20,52,96,0.92)] p-6 text-center text-white shadow-[0_4px_24px_rgba(0,0,0,0.14)]">
+                  <div className="glass-panel rounded-[2rem] bg-[rgba(20,64,118,0.9)] p-6 text-center text-white">
                     <h2 className="text-xl font-bold">Configuration Complete</h2>
                     <p className="mt-2 text-sm text-white/75">
                       {filledCount} of {data.slots.length} slots populated ·{" "}
@@ -462,7 +462,7 @@ export function ConfiguratorWorkspace({
               </div>
 
               <aside className="lg:sticky lg:top-28 lg:self-start">
-              <div className="rounded-[6px] border-2 border-primary/20 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.12),0_12px_32px_rgba(30,72,126,0.12)]">
+              <div className="glass-panel rounded-[2rem] p-4">
                 <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   {selectedSlot?.breakerFamily === "3VA41" ? "Top Zone" : "Lower Zone"}
                 </div>
@@ -490,10 +490,10 @@ export function ConfiguratorWorkspace({
                         key={breaker.id}
                         type="button"
                         disabled={disabled}
-                        className={`cursor-pointer rounded-[6px] border-2 px-2 py-3 text-center text-[17px] font-bold transition hover:-translate-y-0.5 hover:cursor-pointer hover:border-primary hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 ${
+                        className={`pressable cursor-pointer rounded-2xl border-2 px-2 py-3 text-center text-[17px] font-bold transition hover:cursor-pointer hover:border-primary hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 ${
                           selectedBreakerId === breaker.id
-                            ? "border-primary bg-[rgba(30,72,126,0.07)] text-primary"
-                            : "border-border bg-background text-foreground"
+                            ? "border-primary bg-[rgba(43,129,191,0.12)] text-primary shadow-[0_10px_24px_rgba(26,83,141,0.12)]"
+                            : "border-white/70 bg-white/68 text-foreground"
                         }`}
                         title={
                           disabled
@@ -512,7 +512,7 @@ export function ConfiguratorWorkspace({
                 </div>
 
                 {selectedBreaker ? (
-                  <div className="mt-3 flex items-center gap-3 rounded-[6px] border border-[var(--green)] bg-[var(--green-bg)] p-3">
+                  <div className="mt-3 flex items-center gap-3 rounded-2xl border border-[var(--green)] bg-[var(--green-bg)] p-3 shadow-[0_10px_26px_rgba(22,163,117,0.12)]">
                     <div className="shrink-0 text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--green)]">
                       Selected
                     </div>
@@ -522,7 +522,7 @@ export function ConfiguratorWorkspace({
                     </div>
                     <button
                       type="button"
-                      className="cursor-pointer rounded border border-danger/30 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-danger hover:cursor-pointer hover:bg-danger hover:text-white"
+                      className="pressable cursor-pointer rounded-full border border-danger/30 bg-white px-2 py-1 text-[10px] font-semibold text-danger hover:cursor-pointer hover:bg-danger hover:text-white"
                       onClick={() => chooseBreaker(null, false)}
                     >
                       Clear
@@ -565,9 +565,9 @@ export function ConfiguratorWorkspace({
                   </Button>
                 </div>
 
-                <div className="mt-4 mb-2 h-1.5 overflow-hidden rounded bg-border">
+                <div className="mt-4 mb-2 h-2 overflow-hidden rounded-full bg-primary/10">
                   <div
-                    className="h-full rounded bg-primary transition-all"
+                    className="soft-progress h-full rounded-full transition-all duration-500"
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
@@ -587,7 +587,7 @@ export function ConfiguratorWorkspace({
                   Quick Fill
                 </Button>
                 {quickFillOpen ? (
-                  <div className="mt-3 grid gap-2 rounded-[6px] border border-border bg-background p-3">
+                  <div className="mt-3 grid gap-2 rounded-2xl border border-white/70 bg-white/58 p-3 backdrop-blur">
                     <Button type="button" size="sm" variant="secondary" className="min-h-9 text-xs" onClick={() => quickFillLower(45)}>
                       All lower → 45A
                     </Button>
@@ -613,14 +613,14 @@ export function ConfiguratorWorkspace({
             </p>
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
-                <div className="rounded-[6px] border border-border bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)]">
+                <div className="glass-panel rounded-[2rem] p-6">
                   <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Configuration
                   </div>
-                  <div className="mb-5 break-all rounded-[6px] border border-border bg-background px-4 py-3 font-mono text-base font-bold tracking-normal text-primary">
+                  <div className="mb-5 break-all rounded-2xl border border-white/70 bg-white/58 px-4 py-3 font-mono text-base font-bold tracking-normal text-primary backdrop-blur">
                     {data.selectedFrame.catalogNumber}
                   </div>
-                  <div className="mb-5 rounded-[6px] bg-primary p-5 text-center text-white">
+                  <div className="mb-5 rounded-[1.75rem] bg-primary p-5 text-center text-white shadow-[0_18px_40px_rgba(26,83,141,0.24)]">
                     <div className="mb-1 text-xs text-white/70">Total Price</div>
                     <div className="text-4xl font-bold tracking-normal">
                       {currency(bom.totalSellPrice)}
@@ -644,14 +644,14 @@ export function ConfiguratorWorkspace({
                   <ExportQuoteButton data={data} bom={bom} />
                   <button
                     type="button"
-                    className="inline-flex h-7 cursor-pointer items-center justify-center rounded-[6px] border border-border bg-white px-1.5 text-[9px] font-semibold leading-none text-foreground shadow-sm transition hover:cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="pressable inline-flex h-8 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-white/78 px-3 text-[10px] font-semibold leading-none text-foreground shadow-sm backdrop-blur transition hover:cursor-pointer hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     onClick={() => goToStep("breakers")}
                   >
                     ← Edit
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-[6px] bg-primary px-1.5 text-[9px] font-semibold leading-none text-primary-foreground shadow-sm transition hover:cursor-pointer hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="pressable inline-flex h-8 cursor-pointer items-center justify-center gap-1 rounded-full bg-primary px-3 text-[10px] font-semibold leading-none text-primary-foreground shadow-sm transition hover:cursor-pointer hover:bg-[var(--blue-light)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     onClick={() => setSaveOpen(true)}
                   >
                     <Save className="size-3" /> Save
@@ -674,7 +674,7 @@ export function ConfiguratorWorkspace({
         selections={selections}
       />
       <Dialog open={clearOpen} onOpenChange={setClearOpen}>
-        <DialogContent>
+        <DialogContent className="bg-white/80 rounded-[2rem] p-6 text-center">
           <DialogHeader>
             <DialogTitle>Clear breaker selections?</DialogTitle>
             <DialogDescription>

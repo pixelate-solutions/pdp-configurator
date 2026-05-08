@@ -1,7 +1,6 @@
 "use client";
 
 import type { Frame } from "@/lib/configurator-types";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function FrameSelector({
@@ -35,14 +34,10 @@ export function FrameSelector({
             <button
               key={frame.id}
               type="button"
-              className={`cursor-pointer rounded-[6px] border-2 bg-white p-6 text-left transition hover:cursor-pointer hover:border-primary hover:shadow-[0_1px_3px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)] ${
-                frame.id === selectedFrame.id
-                  ? "border-primary shadow-[0_0_0_3px_rgba(30,72,126,0.15)]"
-                  : "border-border"
-              }`}
+              className={`liquid-surface lift-hover cursor-pointer rounded-4xl p-6 text-left transition hover:cursor-pointer hover:border-primary/50 border-2 border-gray-200 shadow-[0_0_0_4px_rgba(43,129,191,0.16),var(--shadow-soft)]`}
               onClick={() => onSelectFrame(frame.id)}
             >
-              <span className="float-right rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-[0_2px_8px_rgba(30,72,126,0.25)]">
+              <span className="float-right rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-[0_10px_24px_rgba(26,83,141,0.22)]">
                 {frame.mainBusAmps}A
               </span>
               <span className="block text-base font-semibold text-primary">
@@ -52,19 +47,14 @@ export function FrameSelector({
                 {frame.systemVoltage} · {frame.irRating} · {frame.feed} Feed ·{" "}
                 {frame.mounting} Mount
               </span>
-              <span className="mt-4 inline-block rounded bg-background px-2 py-1 font-mono text-[11px] text-muted-foreground">
+              <span className="mt-4 inline-block rounded-full border border-white/70 bg-white/58 px-2.5 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
                 {frame.catalogNumber}
               </span>
-              {frame.id === selectedFrame.id ? (
-                <Badge className="ml-2" variant="success">
-                  Selected
-                </Badge>
-              ) : null}
             </button>
           ))}
         </div>
       ) : (
-        <div className="rounded-[6px] border border-dashed border-border bg-white p-6 text-sm text-muted-foreground">
+        <div className="liquid-surface rounded-4xl border border-dashed border-border p-6 text-sm text-muted-foreground">
           {emptyMessage}
         </div>
       )}

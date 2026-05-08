@@ -13,9 +13,9 @@ const labels: Record<BomLine["itemType"], string> = {
 
 export function BomLineItem({ line }: { line: BomLine }) {
   return (
-    <article className="min-w-0 rounded-lg border border-border bg-white p-3">
+    <article className="liquid-surface lift-hover min-w-0 rounded-3xl p-3">
       <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
-        <div className="rounded bg-muted px-2 py-1 text-center text-sm font-bold text-primary">
+        <div className="rounded-2xl bg-primary/10 px-2 py-1 text-center text-sm font-bold text-primary">
           {line.quantity}
         </div>
         <div className="min-w-0">

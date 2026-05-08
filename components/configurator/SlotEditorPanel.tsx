@@ -25,9 +25,9 @@ export function SlotEditorPanel({
 }) {
   if (!selectedSlot) {
     return (
-      <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
+      <section className="liquid-surface rounded-3xl p-4">
         <p className="text-sm font-semibold text-primary">Breaker choice</p>
-        <div className="mt-4 rounded-md bg-muted p-4 text-sm leading-6 text-muted-foreground">
+        <div className="mt-4 rounded-2xl bg-white/54 p-4 text-sm leading-6 text-muted-foreground backdrop-blur">
           Select a slot on the panelboard, then choose one allowed amperage.
           Empty slots automatically include the correct cover.
         </div>
@@ -38,7 +38,7 @@ export function SlotEditorPanel({
   const allowedBreakers = getAllowedBreakers(data, selectedSlot.id);
 
   return (
-    <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
+    <section className="liquid-surface rounded-3xl p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-primary">Breaker choice</p>
@@ -51,7 +51,7 @@ export function SlotEditorPanel({
       </div>
 
       {validationMessage ? (
-        <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm font-medium text-danger">
+        <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 p-3 text-sm font-medium text-danger">
           {validationMessage}
         </div>
       ) : null}
@@ -79,7 +79,7 @@ export function SlotEditorPanel({
         ))}
       </div>
 
-      <details className="mt-4 rounded-md border border-border bg-muted p-3">
+      <details className="mt-4 rounded-2xl border border-white/70 bg-white/54 p-3 backdrop-blur">
         <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
           <Info className="size-4" /> Technical details
         </summary>

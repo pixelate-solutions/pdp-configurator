@@ -5,27 +5,27 @@ import { BomLineItem } from "@/components/configurator/BomLineItem";
 
 export function LiveBom({ bom }: { bom: BomSummary }) {
   return (
-    <section id="live-bom" className="min-w-0 overflow-hidden rounded-[6px] border border-border bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)] sm:p-6">
+    <section id="live-bom" className="glass-panel min-w-0 overflow-hidden rounded-[2rem] p-4 sm:p-6">
       <div className="mb-4 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
         Bill of Materials
       </div>
 
       <div className="mb-4 grid grid-cols-3 gap-2 text-center">
-        <div className="min-w-0 rounded-md bg-muted p-2 sm:p-3">
+        <div className="min-w-0 rounded-2xl border border-white/70 bg-white/54 p-2 shadow-sm backdrop-blur sm:p-3">
           <p className="text-lg font-bold">{bom.filledSlotCount}</p>
           <p className="text-xs text-muted-foreground">Breakers</p>
         </div>
-        <div className="min-w-0 rounded-md bg-muted p-2 sm:p-3">
+        <div className="min-w-0 rounded-2xl border border-white/70 bg-white/54 p-2 shadow-sm backdrop-blur sm:p-3">
           <p className="text-lg font-bold">{bom.emptySlotCount}</p>
           <p className="text-xs text-muted-foreground">Covered</p>
         </div>
-        <div className="min-w-0 rounded-md bg-muted p-2 sm:p-3">
+        <div className="min-w-0 rounded-2xl border border-white/70 bg-white/54 p-2 shadow-sm backdrop-blur sm:p-3">
           <p className="text-lg font-bold">{bom.lines.length}</p>
           <p className="text-xs text-muted-foreground">Items</p>
         </div>
       </div>
 
-      <div className="hidden overflow-hidden rounded-lg md:block">
+      <div className="hidden overflow-hidden rounded-3xl border border-white/60 bg-white/42 backdrop-blur md:block">
         <table className="w-full border-collapse text-sm">
           <thead className="text-left text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
             <tr>

@@ -47,7 +47,7 @@ export default async function AdminDashboardPage() {
             <label className="grid gap-1">
               <span className="text-sm font-semibold">Margin percent</span>
               <input
-                className="min-h-11 w-28 rounded-md border border-border bg-white px-3 py-2 text-lg font-bold"
+                className="min-h-11 w-28 rounded-2xl border border-border bg-white/82 px-3 py-2 text-lg font-bold shadow-inner outline-none backdrop-blur transition focus:border-primary/55 focus:ring-4 focus:ring-primary/15"
                 name="defaultMargin"
                 type="number"
                 min="0"

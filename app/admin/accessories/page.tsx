@@ -52,7 +52,7 @@ export default async function AdminAccessoriesPage() {
         <h2 className="mb-3 text-xl font-semibold">Edit accessories</h2>
         <div className="grid gap-3">
           {accessories.map((accessory) => (
-            <details key={accessory.id} className="rounded-lg border border-border bg-white p-4">
+            <details key={accessory.id} className="liquid-surface rounded-3xl p-4">
               <summary className="cursor-pointer font-semibold">
                 {accessory.name} • {accessory.catalogNumber}
               </summary>

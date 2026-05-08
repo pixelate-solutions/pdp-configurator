@@ -42,7 +42,7 @@ export function ExportQuoteButton({
     <div className="flex flex-wrap gap-2 text-sm">
       <button
         type="button"
-        className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-white px-1.5 text-[9px] font-semibold leading-none text-foreground shadow-sm transition hover:cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="pressable inline-flex h-8 cursor-pointer items-center justify-center gap-1 rounded-full border border-white/70 bg-white/78 px-3 text-[10px] font-semibold leading-none text-foreground shadow-sm backdrop-blur transition hover:cursor-pointer hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         onClick={() => window.print()}
       >
         <Printer className="size-3" />
@@ -50,7 +50,7 @@ export function ExportQuoteButton({
       </button>
       <button
         type="button"
-        className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-white px-1.5 text-[9px] font-semibold leading-none text-foreground shadow-sm transition hover:cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="pressable inline-flex h-8 cursor-pointer items-center justify-center gap-1 rounded-full border border-white/70 bg-white/78 px-3 text-[10px] font-semibold leading-none text-foreground shadow-sm backdrop-blur transition hover:cursor-pointer hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         onClick={exportCsv}
       >
         <Download className="size-3" />

@@ -107,8 +107,8 @@ export function PanelboardGraphic({
   }, [selectedSlotId, previewMode, completed, data.slots, slotGeometry]);
 
   return (
-    <section className="overflow-hidden rounded-[6px] border border-border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)]">
-      <div className="flex items-center justify-between gap-3 bg-primary px-5 py-3.5 text-white">
+    <section className="glass-panel overflow-hidden rounded-[2rem]">
+      <div className="flex items-center justify-between gap-3 border-b border-white/18 bg-primary/92 px-5 py-3.5 text-white backdrop-blur">
         <div className="min-w-0">
           <div className="truncate text-[13px] font-bold">
             {data.selectedFrame.panelType} · {data.selectedFrame.heightInches} in
@@ -122,7 +122,7 @@ export function PanelboardGraphic({
         </div>
       </div>
 
-      <div className="bg-[#2a2a2a] p-2 sm:p-4">
+      <div className="bg-[#1f2933] p-2 sm:p-4">
         <svg
           className="mx-auto block h-auto w-full max-w-[480px]"
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
@@ -208,7 +208,7 @@ export function PanelboardGraphic({
                   rx="2"
                   stroke={stroke}
                   strokeWidth={strokeWidth}
-                  className="cursor-pointer transition hover:cursor-pointer hover:fill-[#dce8f8]"
+                  className="cursor-pointer transition duration-300 hover:cursor-pointer hover:fill-[#dce8f8]"
                   onClick={() => onSelectSlot(slot)}
                 />
                 <text x={geometry.x + 8} y={geometry.y + 12} fontSize="7" fill="#9a9590" fontWeight="600" pointerEvents="none">

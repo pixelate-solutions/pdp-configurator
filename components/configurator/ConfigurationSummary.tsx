@@ -20,7 +20,7 @@ export function ConfigurationSummary({ data }: { data: ConfiguratorData }) {
   ];
 
   return (
-    <details className="rounded-lg border border-border bg-white p-4 shadow-sm">
+    <details className="liquid-surface rounded-3xl p-4">
       <summary className="cursor-pointer text-sm font-semibold text-primary">
         Technical details
       </summary>

@@ -22,8 +22,8 @@ export function BreakerSlot({
     <button
       type="button"
       className={cn(
-        "absolute flex min-h-12 min-w-0 cursor-pointer flex-col justify-center overflow-hidden rounded-md border p-1.5 text-left shadow-sm transition tap-highlight hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-14 sm:p-2",
-        "hover:shadow-md",
+        "pressable absolute flex min-h-12 min-w-0 cursor-pointer flex-col justify-center overflow-hidden rounded-2xl border p-1.5 text-left shadow-sm transition tap-highlight hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-14 sm:p-2",
+        "hover:shadow-lg",
         filled
           ? "border-primary/40 bg-primary/10 text-foreground"
           : "border-dashed border-slate-300 bg-white/80 text-muted-foreground",

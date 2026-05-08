@@ -19,7 +19,7 @@ export function MobileBottomActionBar({
   onSave: () => void;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 overflow-hidden border-t border-border bg-white p-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] md:hidden no-print">
+    <div className="no-print fixed inset-x-0 bottom-0 z-40 overflow-hidden border-t border-white/70 bg-white/74 p-2 shadow-[0_-14px_36px_rgba(24,48,74,0.16)] backdrop-blur-xl md:hidden">
       <div className="mx-auto grid max-w-lg grid-cols-3 gap-1.5">
         <Button className="min-w-0 px-2" type="button" variant="secondary" onClick={onChooseBreaker}>
           <SlidersHorizontal className="size-4" />

@@ -23,7 +23,7 @@ export function AdminFrameForm({ frame }: { frame?: Frame }) {
   ];
 
   return (
-    <form action={upsertFrameAction} className="rounded-lg border border-border bg-white p-4 shadow-sm">
+    <form action={upsertFrameAction} className="liquid-surface rounded-3xl p-4">
       <input type="hidden" name="id" value={frame?.id ?? ""} />
       <div className="grid gap-3 sm:grid-cols-2">
         {fields.map(([name, label, type]) => (
@@ -41,15 +41,15 @@ export function AdminFrameForm({ frame }: { frame?: Frame }) {
         ))}
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold">
+        <label className="pressable flex min-h-11 items-center gap-2 rounded-2xl border border-white/70 bg-white/58 px-3 text-sm font-semibold backdrop-blur">
           <input name="seLabel" type="checkbox" defaultChecked={frame?.seLabel ?? false} />
           SE label
         </label>
-        <label className="flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold">
+        <label className="pressable flex min-h-11 items-center gap-2 rounded-2xl border border-white/70 bg-white/58 px-3 text-sm font-semibold backdrop-blur">
           <input name="seriesRated" type="checkbox" defaultChecked={frame?.seriesRated ?? false} />
           Series rated
         </label>
-        <label className="flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold">
+        <label className="pressable flex min-h-11 items-center gap-2 rounded-2xl border border-white/70 bg-white/58 px-3 text-sm font-semibold backdrop-blur">
           <input name="isActive" type="checkbox" defaultChecked={frame?.isActive ?? true} />
           Active
         </label>
