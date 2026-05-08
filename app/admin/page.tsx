@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAdminCatalog } from "@/lib/db/queries";
 import { currency } from "@/lib/utils";
+import { updateDefaultMarginAction } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -37,6 +38,31 @@ export default async function AdminDashboardPage() {
           </Card>
         ))}
       </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>Default pricing margin</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={updateDefaultMarginAction} className="flex flex-wrap items-end gap-3">
+            <label className="grid gap-1">
+              <span className="text-sm font-semibold">Margin percent</span>
+              <input
+                className="min-h-11 w-28 rounded-md border border-border bg-white px-3 py-2 text-lg font-bold"
+                name="defaultMargin"
+                type="number"
+                min="0"
+                max="99"
+                step="0.5"
+                defaultValue={(catalog.defaultMargin * 100).toFixed(1)}
+              />
+            </label>
+            <Button type="submit">Save margin</Button>
+          </form>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Customer price is calculated from Electro-Matic cost using this margin.
+          </p>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Quote pipeline</CardTitle>

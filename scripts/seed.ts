@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import {
   accessories,
+  adminSettings,
   breakerOptions,
   coverPlates,
   frameAccessories,
@@ -10,15 +11,15 @@ import {
   panelboardFrames,
   panelboardSlots,
 } from "../lib/db/schema";
+import { DEFAULT_ADMIN_MARGIN } from "../lib/pricing";
 import {
-  SEEDED_FRAME_ID,
+  allSeededFrameAccessories,
+  allSeededSlots,
   seededAccessories,
   seededBreakerOptions,
   seededCoverPlates,
-  seededFrame,
-  seededFrameAccessories,
-  seededMainBreaker,
-  seededSlots,
+  seededFrames,
+  seededMainBreakers,
 } from "../lib/seed-data";
 
 if (!process.env.DATABASE_URL) {
@@ -30,22 +31,34 @@ const db = drizzle(sql);
 
 async function main() {
   await db
-    .insert(panelboardFrames)
-    .values(seededFrame)
+    .insert(adminSettings)
+    .values({ id: "default", defaultMargin: DEFAULT_ADMIN_MARGIN })
     .onConflictDoUpdate({
-      target: panelboardFrames.id,
-      set: { ...seededFrame, updatedAt: new Date() },
+      target: adminSettings.id,
+      set: { defaultMargin: DEFAULT_ADMIN_MARGIN, updatedAt: new Date() },
     });
 
-  await db
-    .insert(frameMainBreakers)
-    .values(seededMainBreaker)
-    .onConflictDoUpdate({
-      target: frameMainBreakers.id,
-      set: { ...seededMainBreaker, updatedAt: new Date() },
-    });
+  for (const frame of seededFrames) {
+    await db
+      .insert(panelboardFrames)
+      .values(frame)
+      .onConflictDoUpdate({
+        target: panelboardFrames.id,
+        set: { ...frame, updatedAt: new Date() },
+      });
+  }
 
-  for (const slot of seededSlots) {
+  for (const mainBreaker of seededMainBreakers) {
+    await db
+      .insert(frameMainBreakers)
+      .values(mainBreaker)
+      .onConflictDoUpdate({
+        target: frameMainBreakers.id,
+        set: { ...mainBreaker, updatedAt: new Date() },
+      });
+  }
+
+  for (const slot of allSeededSlots) {
     await db
       .insert(panelboardSlots)
       .values(slot)
@@ -85,12 +98,14 @@ async function main() {
       });
   }
 
-  await db
-    .delete(frameAccessories)
-    .where(eq(frameAccessories.frameId, SEEDED_FRAME_ID));
-  await db.insert(frameAccessories).values(seededFrameAccessories);
+  for (const frame of seededFrames) {
+    await db
+      .delete(frameAccessories)
+      .where(eq(frameAccessories.frameId, frame.id));
+  }
+  await db.insert(frameAccessories).values(allSeededFrameAccessories);
 
-  console.log("Seeded Siemens P5 90-inch panelboard frame.");
+  console.log("Seeded Siemens P5 400A, 600A, and 800A panelboard frames.");
 }
 
 main()

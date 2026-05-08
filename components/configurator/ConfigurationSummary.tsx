@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 export function ConfigurationSummary({ data }: { data: ConfiguratorData }) {
   const frame = data.selectedFrame;
   const details = [
-    ["Customer", "Fori / Electro-Matic Products Inc."],
     ["Panel type", frame.panelType],
     ["Catalog", frame.catalogNumber],
     ["Voltage", frame.systemVoltage],
@@ -21,9 +20,9 @@ export function ConfigurationSummary({ data }: { data: ConfiguratorData }) {
   ];
 
   return (
-    <details className="rounded-lg border border-border bg-white p-4 shadow-sm" open>
+    <details className="rounded-lg border border-border bg-white p-4 shadow-sm">
       <summary className="cursor-pointer text-sm font-semibold text-primary">
-        Frame details
+        Technical details
       </summary>
       <div className="mt-4 flex flex-wrap gap-2">
         <Badge>{frame.heightInches} in</Badge>

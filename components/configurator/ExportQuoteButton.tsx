@@ -2,7 +2,6 @@
 
 import { Download, Printer } from "lucide-react";
 import type { BomSummary, ConfiguratorData } from "@/lib/configurator-types";
-import { Button } from "@/components/ui/button";
 
 function csvEscape(value: string | number) {
   const text = String(value);
@@ -40,15 +39,23 @@ export function ExportQuoteButton({
   };
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <Button type="button" variant="secondary" onClick={() => window.print()}>
-        <Printer className="size-4" />
+    <div className="flex flex-wrap gap-2 text-sm">
+      <button
+        type="button"
+        className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-white px-1.5 text-[9px] font-semibold leading-none text-foreground shadow-sm transition hover:cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        onClick={() => window.print()}
+      >
+        <Printer className="size-3" />
         PDF quote
-      </Button>
-      <Button type="button" variant="secondary" onClick={exportCsv}>
-        <Download className="size-4" />
+      </button>
+      <button
+        type="button"
+        className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border border-border bg-white px-1.5 text-[9px] font-semibold leading-none text-foreground shadow-sm transition hover:cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        onClick={exportCsv}
+      >
+        <Download className="size-3" />
         CSV BOM
-      </Button>
+      </button>
     </div>
   );
 }

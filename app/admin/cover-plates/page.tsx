@@ -1,5 +1,6 @@
 import { getAdminCatalog } from "@/lib/db/queries";
 import { currency } from "@/lib/utils";
+import { marginFromCostSell } from "@/lib/pricing";
 import { AdminCoverPlateForm } from "@/components/admin/AdminCoverPlateForm";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { DeleteRecordButton } from "@/components/admin/DeleteRecordButton";
@@ -23,7 +24,13 @@ export default async function AdminCoverPlatesPage() {
             { key: "slotType", header: "Slot type", render: (row) => <Badge>{row.slotType}</Badge> },
             { key: "catalog", header: "Catalog", render: (row) => row.catalogNumber },
             { key: "description", header: "Description", render: (row) => row.description },
+            { key: "cost", header: "Cost", render: (row) => currency(row.cost) },
             { key: "sell", header: "Sell", render: (row) => currency(row.sellPrice) },
+            {
+              key: "margin",
+              header: "Margin",
+              render: (row) => `${(marginFromCostSell(row.cost, row.sellPrice) * 100).toFixed(1)}%`,
+            },
             {
               key: "active",
               header: "Status",

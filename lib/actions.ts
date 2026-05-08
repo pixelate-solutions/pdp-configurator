@@ -8,6 +8,7 @@ import { buildBom } from "@/lib/bom";
 import { getConfiguratorData } from "@/lib/db/queries";
 import { getDb } from "@/lib/db/client";
 import {
+  adminSettings,
   accessories,
   breakerOptions,
   configurationItems,
@@ -284,4 +285,22 @@ export async function deleteSlotAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (id) await db.delete(panelboardSlots).where(eq(panelboardSlots.id, id));
   revalidatePath("/admin/frames");
+}
+
+export async function updateDefaultMarginAction(formData: FormData) {
+  const db = getDb();
+  if (!db) return;
+  const percentValue = Number(formData.get("defaultMargin") ?? 34);
+  const defaultMargin = Math.max(0, Math.min(0.99, percentValue / 100));
+
+  await db
+    .insert(adminSettings)
+    .values({ id: "default", defaultMargin, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: adminSettings.id,
+      set: { defaultMargin, updatedAt: new Date() },
+    });
+
+  revalidatePath("/admin");
+  revalidatePath("/configurator");
 }

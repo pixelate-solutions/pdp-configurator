@@ -15,7 +15,7 @@ export function DrawerContent({
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 md:hidden" />
       <DialogPrimitive.Content
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 max-h-[88vh] overflow-y-auto rounded-t-2xl border border-border bg-white p-5 shadow-2xl focus:outline-none",

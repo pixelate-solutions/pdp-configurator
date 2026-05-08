@@ -7,8 +7,11 @@ import type {
   MainBreaker,
   PanelSlot,
 } from "@/lib/configurator-types";
+import { DEFAULT_ADMIN_MARGIN, sellPriceFromCost } from "@/lib/pricing";
 
 export const SEEDED_FRAME_ID = "00000000-0000-4000-8000-000000000001";
+export const SEEDED_FRAME_400_ID = "00000000-0000-4000-8000-000000000040";
+export const SEEDED_FRAME_600_ID = "00000000-0000-4000-8000-000000000060";
 
 const seededId = (number: number) =>
   `00000000-0000-4000-8000-${String(number).padStart(12, "0")}`;
@@ -29,10 +32,32 @@ export const seededFrame: Frame = {
   seLabel: false,
   seriesRated: false,
   conduitArea: "30.000 x 10.75",
-  baseCost: 7850,
-  baseSellPrice: 11250,
+  baseCost: 9029.89,
+  baseSellPrice: sellPriceFromCost(9029.89, DEFAULT_ADMIN_MARGIN),
   isActive: true,
 };
+
+export const seeded400Frame: Frame = {
+  ...seededFrame,
+  id: SEEDED_FRAME_400_ID,
+  name: "Siemens P5 90 in 400A",
+  catalogNumber: "P5E90VF400ETS",
+  mainBusAmps: 400,
+  baseCost: 6933.71,
+  baseSellPrice: sellPriceFromCost(6933.71, DEFAULT_ADMIN_MARGIN),
+};
+
+export const seeded600Frame: Frame = {
+  ...seededFrame,
+  id: SEEDED_FRAME_600_ID,
+  name: "Siemens P5 90 in 600A",
+  catalogNumber: "P5E90VK600ETS",
+  mainBusAmps: 600,
+  baseCost: 8442.27,
+  baseSellPrice: sellPriceFromCost(8442.27, DEFAULT_ADMIN_MARGIN),
+};
+
+export const seededFrames: Frame[] = [seeded400Frame, seeded600Frame, seededFrame];
 
 export const seededMainBreaker: MainBreaker = {
   id: "00000000-0000-4000-8000-000000000101",
@@ -46,9 +71,39 @@ export const seededMainBreaker: MainBreaker = {
   description: "800A / 3P Siemens 3VA55-HMAS main breaker",
   lugDescription: "3VA Mechanical (2)4/0-600Kcmil Cu/Al Lug",
   lugCatalogNumber: "3VA95730JB23",
-  cost: 2875,
-  sellPrice: 4185,
+  cost: 0,
+  sellPrice: 0,
 };
+
+export const seeded400MainBreaker: MainBreaker = {
+  ...seededMainBreaker,
+  id: "00000000-0000-4000-8000-000000000140",
+  frameId: SEEDED_FRAME_400_ID,
+  family: "3VA53-HJAS",
+  catalogNumber: "3VA53406EC310AA0",
+  amps: 400,
+  description: "400A / 3P Siemens 3VA53-HJAS main breaker included with frame",
+  lugDescription: "3VA Mechanical (2)2/0-250Kcmil Cu/Al Lug",
+  lugCatalogNumber: "3VA94730JJ23",
+};
+
+export const seeded600MainBreaker: MainBreaker = {
+  ...seededMainBreaker,
+  id: "00000000-0000-4000-8000-000000000160",
+  frameId: SEEDED_FRAME_600_ID,
+  family: "3VA54-HLAS",
+  catalogNumber: "3VA54606EC310AA0",
+  amps: 600,
+  description: "600A / 3P Siemens 3VA54-HLAS main breaker included with frame",
+  lugDescription: "3VA Mechanical (2)2/0-500Kcmil Cu/Al Lug",
+  lugCatalogNumber: "3VA94730JJ23",
+};
+
+export const seededMainBreakers: MainBreaker[] = [
+  seeded400MainBreaker,
+  seeded600MainBreaker,
+  seededMainBreaker,
+];
 
 const smallSlotRows = [
   ["S01", "A1", "1/3/5", 297, 8, 25],
@@ -76,51 +131,84 @@ const largeSlotRows = [
   ["L16", "B16", "56/58/60", 325],
 ] as const;
 
-export const seededSlots: PanelSlot[] = [
-  ...smallSlotRows.map(([slotKey, label, circuitNumbers, uniqueId, x, y], index) => ({
-    id: seededId(100 + index + 1),
-    frameId: SEEDED_FRAME_ID,
-    slotKey,
-    displayOrder: index + 1,
-    label,
-    circuitNumbers,
-    uniqueId,
-    slotType: "small-3va41",
-    breakerFamily: "3VA41",
-    defaultAmps: 20,
-    poles: 3,
-    interruptRating: "65,000 AIC",
-    lugSize: "(1)#14-#8 CU/AL",
-    x,
-    y,
-    width: 40,
-    height: 8,
-    isActive: true,
-  })),
-  ...largeSlotRows.map(([slotKey, label, circuitNumbers, uniqueId], index) => {
-    const col = index % 2;
-    const row = Math.floor(index / 2);
-    return {
-      id: seededId(200 + index + 1),
-      frameId: SEEDED_FRAME_ID,
+const large600SlotRows = [
+  ...largeSlotRows,
+  ["L17", "B17", "61/63/65", 310],
+  ["L18", "B18", "62/64/66", 311],
+] as const;
+
+function makeSlots(
+  frameId: string,
+  baseId: number,
+  uniqueIds: { small: number[]; large: readonly (readonly [string, string, string, number])[] },
+) {
+  return [
+    ...smallSlotRows.map(([slotKey, label, circuitNumbers], index) => ({
+      id: seededId(baseId + 100 + index + 1),
+      frameId,
       slotKey,
-      displayOrder: index + 5,
+      displayOrder: index + 1,
       label,
       circuitNumbers,
-      uniqueId,
-      slotType: "large-3va52",
-      breakerFamily: "3VA52",
-      defaultAmps: 200,
+      uniqueId: uniqueIds.small[index],
+      slotType: "small-3va41",
+      breakerFamily: "3VA41",
+      defaultAmps: 20,
       poles: 3,
       interruptRating: "65,000 AIC",
-      lugSize: "(1)#6 AWG - 350 KCMIL CU/AL",
-      x: col === 0 ? 8 : 52,
-      y: 46 + row * 6.1,
+      lugSize: "(1)#14-#8 CU/AL",
+      x: index % 2 === 0 ? 8 : 52,
+      y: index < 2 ? 25 : 34,
       width: 40,
-      height: 5.4,
+      height: 8,
       isActive: true,
-    };
-  }),
+    })),
+    ...uniqueIds.large.map(([slotKey, label, circuitNumbers, uniqueId], index) => {
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      return {
+        id: seededId(baseId + 200 + index + 1),
+        frameId,
+        slotKey,
+        displayOrder: index + 5,
+        label,
+        circuitNumbers,
+        uniqueId,
+        slotType: "large-3va52",
+        breakerFamily: "3VA52",
+        defaultAmps: 200,
+        poles: 3,
+        interruptRating: "65,000 AIC",
+        lugSize: "(1)#6 AWG - 350 KCMIL CU/AL",
+        x: col === 0 ? 8 : 52,
+        y: 46 + row * 5.3,
+        width: 40,
+        height: 4.8,
+        isActive: true,
+      };
+    }),
+  ] satisfies PanelSlot[];
+}
+
+export const seeded400Slots = makeSlots(SEEDED_FRAME_400_ID, 4000, {
+  small: [373, 374, 376, 377],
+  large: largeSlotRows.map((row, index) => [row[0], row[1], row[2], 379 + index * 3] as const),
+});
+
+export const seeded600Slots = makeSlots(SEEDED_FRAME_600_ID, 6000, {
+  small: [278, 279, 281, 282],
+  large: large600SlotRows,
+});
+
+export const seededSlots: PanelSlot[] = makeSlots(SEEDED_FRAME_ID, 0, {
+  small: [297, 298, 300, 301],
+  large: largeSlotRows,
+});
+
+export const allSeededSlots: PanelSlot[] = [
+  ...seeded400Slots,
+  ...seeded600Slots,
+  ...seededSlots,
 ];
 
 export const seededBreakerOptions: BreakerOption[] = [
@@ -134,8 +222,8 @@ export const seededBreakerOptions: BreakerOption[] = [
     catalogNumber: "3VA4120-HEAB-PROV",
     description: "20A / 3P Siemens 3VA41 provision breaker kit",
     lugSize: "(1)#14-#8 CU/AL",
-    cost: 245,
-    sellPrice: 365,
+    cost: 162.58,
+    sellPrice: sellPriceFromCost(162.58, DEFAULT_ADMIN_MARGIN),
     isActive: true,
   },
   {
@@ -148,8 +236,8 @@ export const seededBreakerOptions: BreakerOption[] = [
     catalogNumber: "3VA4130-HEAB-PROV",
     description: "30A / 3P Siemens 3VA41 provision breaker kit",
     lugSize: "(1)#14-#8 CU/AL",
-    cost: 255,
-    sellPrice: 385,
+    cost: 162.58,
+    sellPrice: sellPriceFromCost(162.58, DEFAULT_ADMIN_MARGIN),
     isActive: true,
   },
   ...[45, 60, 100, 150, 200].map((amps, index) => ({
@@ -163,8 +251,8 @@ export const seededBreakerOptions: BreakerOption[] = [
       amps === 200 ? "3VA52200-HFAS-PROV" : `3VA52${amps}-HFAS-PROV`,
     description: `${amps}A / 3P Siemens 3VA52 provision breaker kit`,
     lugSize: "(1)#6 AWG - 350 KCMIL CU/AL",
-    cost: 620 + index * 95,
-    sellPrice: 920 + index * 150,
+    cost: [463.87, 355.66, 400, 438, 476.36][index],
+    sellPrice: sellPriceFromCost([463.87, 355.66, 400, 438, 476.36][index], DEFAULT_ADMIN_MARGIN),
     isActive: true,
   })),
 ];
@@ -175,8 +263,8 @@ export const seededCoverPlates: CoverPlate[] = [
     slotType: "small-3va41",
     catalogNumber: "P5-CP-3VA41-PROV",
     description: "Cover plate for empty 3VA41 provision slot",
-    cost: 18,
-    sellPrice: 32,
+    cost: 0,
+    sellPrice: 0,
     isActive: true,
   },
   {
@@ -184,17 +272,17 @@ export const seededCoverPlates: CoverPlate[] = [
     slotType: "large-3va52",
     catalogNumber: "P5-CP-3VA52-PROV",
     description: "Cover plate for empty 3VA52 provision slot",
-    cost: 32,
-    sellPrice: 58,
+    cost: 0,
+    sellPrice: 0,
     isActive: true,
   },
 ];
 
 export const seededAccessories: Accessory[] = [
-  ["Std Stl/Al Gnd Connector", "P5-GND-STAL", "Standard steel/aluminum ground connector", 25, 45],
-  ["Card Holder - Std Plastic Sleeve", "P5-CARD-SLEEVE", "Standard plastic circuit card holder sleeve", 12, 24],
-  ["Al/Cu Branch Connector", "P5-BRANCH-ALCU", "Aluminum/copper branch connector", 40, 72],
-  ["Certification - UL", "UL-CERT-P5", "UL certification label and documentation", 55, 95],
+  ["Std Stl/Al Gnd Connector", "P5-GND-STAL", "Standard steel/aluminum ground connector", 0, 0],
+  ["Card Holder - Std Plastic Sleeve", "P5-CARD-SLEEVE", "Standard plastic circuit card holder sleeve", 0, 0],
+  ["Al/Cu Branch Connector", "P5-BRANCH-ALCU", "Aluminum/copper branch connector", 0, 0],
+  ["Certification - UL", "UL-CERT-P5", "UL certification label and documentation", 0, 0],
 ].map(([name, catalogNumber, description, cost, sellPrice], index) => ({
   id: `00000000-0000-4000-8000-00000000600${index + 1}`,
   name: String(name),
@@ -214,4 +302,15 @@ export const seededFrameAccessories: FrameAccessory[] = seededAccessories.map(
     quantity: 1,
     ruleType: "required",
   }),
+);
+
+export const allSeededFrameAccessories: FrameAccessory[] = seededFrames.flatMap(
+  (frame, frameIndex) =>
+    seededAccessories.map((accessory, index) => ({
+      id: seededId(7000 + frameIndex * 10 + index + 1),
+      frameId: frame.id,
+      accessoryId: accessory.id,
+      quantity: 1,
+      ruleType: "required",
+    })),
 );

@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
+  adminSettings,
   accessories,
   breakerOptions,
   configurationItems,
@@ -14,19 +15,69 @@ import {
 import type { ConfiguratorData, SlotSelection } from "@/lib/configurator-types";
 import {
   SEEDED_FRAME_ID,
+  allSeededFrameAccessories,
+  allSeededSlots,
   seededAccessories,
   seededBreakerOptions,
   seededCoverPlates,
   seededFrame,
-  seededFrameAccessories,
+  seededFrames,
   seededMainBreaker,
-  seededSlots,
+  seededMainBreakers,
 } from "@/lib/seed-data";
 import { createDefaultSelections } from "@/lib/bom";
+import { DEFAULT_ADMIN_MARGIN, sellPriceFromCost } from "@/lib/pricing";
+
+async function getPricingMargin() {
+  const db = getDb();
+  if (!db) return DEFAULT_ADMIN_MARGIN;
+
+  try {
+    const [settings] = await db
+      .select()
+      .from(adminSettings)
+      .where(eq(adminSettings.id, "default"))
+      .limit(1);
+    return settings?.defaultMargin ?? DEFAULT_ADMIN_MARGIN;
+  } catch {
+    return DEFAULT_ADMIN_MARGIN;
+  }
+}
+
+function applyMargin(data: ConfiguratorData, margin: number): ConfiguratorData {
+  return {
+    ...data,
+    frames: data.frames.map((frame) => ({
+      ...frame,
+      baseSellPrice: sellPriceFromCost(frame.baseCost, margin),
+    })),
+    selectedFrame: {
+      ...data.selectedFrame,
+      baseSellPrice: sellPriceFromCost(data.selectedFrame.baseCost, margin),
+    },
+    mainBreaker: {
+      ...data.mainBreaker,
+      sellPrice: sellPriceFromCost(data.mainBreaker.cost, margin),
+    },
+    breakerOptions: data.breakerOptions.map((breaker) => ({
+      ...breaker,
+      sellPrice: sellPriceFromCost(breaker.cost, margin),
+    })),
+    coverPlates: data.coverPlates.map((plate) => ({
+      ...plate,
+      sellPrice: sellPriceFromCost(plate.cost, margin),
+    })),
+    accessories: data.accessories.map((accessory) => ({
+      ...accessory,
+      sellPrice: sellPriceFromCost(accessory.cost, margin),
+    })),
+  };
+}
 
 export async function getConfiguratorData(frameId?: string): Promise<ConfiguratorData> {
   const db = getDb();
-  if (!db) return getFallbackConfiguratorData(frameId);
+  const margin = await getPricingMargin();
+  if (!db) return applyMargin(getFallbackConfiguratorData(frameId), margin);
 
   try {
     const frames = await db
@@ -72,7 +123,7 @@ export async function getConfiguratorData(frameId?: string): Promise<Configurato
           .orderBy(asc(accessories.name)),
       ]);
 
-    return {
+    return applyMargin({
       frames,
       selectedFrame,
       mainBreaker: mainBreaker ?? seededMainBreaker,
@@ -81,23 +132,32 @@ export async function getConfiguratorData(frameId?: string): Promise<Configurato
       coverPlates: plates,
       accessories: allAccessories,
       frameAccessories: linkedAccessories,
-    };
+    }, margin);
   } catch (error) {
     console.error("Falling back to seeded configurator data:", error);
-    return getFallbackConfiguratorData(frameId);
+    return applyMargin(getFallbackConfiguratorData(frameId), margin);
   }
 }
 
 export function getFallbackConfiguratorData(frameId?: string): ConfiguratorData {
+  const selectedFrame =
+    seededFrames.find((frame) => frame.id === frameId) ??
+    seededFrames.find((frame) => frame.id === SEEDED_FRAME_ID) ??
+    seededFrame;
+
   return {
-    frames: [seededFrame],
-    selectedFrame: frameId && frameId !== SEEDED_FRAME_ID ? seededFrame : seededFrame,
-    mainBreaker: seededMainBreaker,
-    slots: seededSlots,
+    frames: seededFrames,
+    selectedFrame,
+    mainBreaker:
+      seededMainBreakers.find((breaker) => breaker.frameId === selectedFrame.id) ??
+      seededMainBreaker,
+    slots: allSeededSlots.filter((slot) => slot.frameId === selectedFrame.id),
     breakerOptions: seededBreakerOptions,
     coverPlates: seededCoverPlates,
     accessories: seededAccessories,
-    frameAccessories: seededFrameAccessories,
+    frameAccessories: allSeededFrameAccessories.filter(
+      (item) => item.frameId === selectedFrame.id,
+    ),
   };
 }
 
@@ -131,14 +191,28 @@ export async function getSavedConfiguration(id: string) {
 
 export async function getAdminCatalog() {
   const db = getDb();
+  const defaultMargin = await getPricingMargin();
   if (!db) {
     return {
-      frames: [seededFrame],
-      slots: seededSlots,
-      breakerOptions: seededBreakerOptions,
-      coverPlates: seededCoverPlates,
-      accessories: seededAccessories,
+      frames: seededFrames.map((frame) => ({
+        ...frame,
+        baseSellPrice: sellPriceFromCost(frame.baseCost, defaultMargin),
+      })),
+      slots: allSeededSlots,
+      breakerOptions: seededBreakerOptions.map((breaker) => ({
+        ...breaker,
+        sellPrice: sellPriceFromCost(breaker.cost, defaultMargin),
+      })),
+      coverPlates: seededCoverPlates.map((plate) => ({
+        ...plate,
+        sellPrice: sellPriceFromCost(plate.cost, defaultMargin),
+      })),
+      accessories: seededAccessories.map((accessory) => ({
+        ...accessory,
+        sellPrice: sellPriceFromCost(accessory.cost, defaultMargin),
+      })),
       configurations: [],
+      defaultMargin,
     };
   }
 
@@ -153,11 +227,24 @@ export async function getAdminCatalog() {
     ]);
 
   return {
-    frames,
+    frames: frames.map((frame) => ({
+      ...frame,
+      baseSellPrice: sellPriceFromCost(frame.baseCost, defaultMargin),
+    })),
     slots,
-    breakerOptions: breakers,
-    coverPlates: plates,
-    accessories: allAccessories,
+    breakerOptions: breakers.map((breaker) => ({
+      ...breaker,
+      sellPrice: sellPriceFromCost(breaker.cost, defaultMargin),
+    })),
+    coverPlates: plates.map((plate) => ({
+      ...plate,
+      sellPrice: sellPriceFromCost(plate.cost, defaultMargin),
+    })),
+    accessories: allAccessories.map((accessory) => ({
+      ...accessory,
+      sellPrice: sellPriceFromCost(accessory.cost, defaultMargin),
+    })),
     configurations: savedConfigurations,
+    defaultMargin,
   };
 }

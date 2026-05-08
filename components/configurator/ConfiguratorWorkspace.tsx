@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, RotateCcw, Save } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  Maximize2,
+  Minimize2,
+  Save,
+  SlidersHorizontal,
+} from "lucide-react";
 import type {
   BreakerOption,
   ConfiguratorData,
@@ -12,54 +19,125 @@ import type {
 import {
   buildBom,
   createDefaultSelections,
+  getAllowedBreakers,
   validateSelection,
 } from "@/lib/bom";
+import { currency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FrameSelector } from "@/components/configurator/FrameSelector";
 import { PanelboardGraphic } from "@/components/configurator/PanelboardGraphic";
-import { SlotEditorPanel } from "@/components/configurator/SlotEditorPanel";
-import { SlotEditorSheet } from "@/components/configurator/SlotEditorSheet";
 import { LiveBom } from "@/components/configurator/LiveBom";
 import { MobileBottomActionBar } from "@/components/configurator/MobileBottomActionBar";
 import { ConfigurationSummary } from "@/components/configurator/ConfigurationSummary";
 import { SaveConfigurationDialog } from "@/components/configurator/SaveConfigurationDialog";
 import { ExportQuoteButton } from "@/components/configurator/ExportQuoteButton";
 
+type ConfiguratorStep = "frame" | "breakers" | "quote";
+
+const stepOrder: ConfiguratorStep[] = ["frame", "breakers", "quote"];
+
 export function ConfiguratorWorkspace({
   data,
   initialSelections,
+  initialStep = "frame",
 }: {
   data: ConfiguratorData;
   initialSelections?: SlotSelection;
+  initialStep?: ConfiguratorStep;
 }) {
   const router = useRouter();
   const [selections, setSelections] = useState<SlotSelection>(
     initialSelections ?? createDefaultSelections(data),
   );
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(
-    data.slots[0]?.id ?? null,
-  );
+  const [activeStep, setActiveStep] = useState<ConfiguratorStep>(initialStep);
+  const [breakerStarted, setBreakerStarted] = useState(false);
+  const [walkIndex, setWalkIndex] = useState(0);
   const [invalidSlotId, setInvalidSlotId] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState("");
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
+  const [quickFillOpen, setQuickFillOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState(true);
+  const [completed, setCompleted] = useState(false);
 
   const bom = useMemo(() => buildBom(data, selections), [data, selections]);
-  const selectedSlot =
-    data.slots.find((slot) => slot.id === selectedSlotId) ?? null;
+  const selectedSlot = data.slots[walkIndex] ?? data.slots[0] ?? null;
+  const selectedSlotId = selectedSlot?.id ?? null;
   const selectedBreakerId = selectedSlot
     ? selections[selectedSlot.id] ?? null
     : null;
+  const selectedBreaker = selectedBreakerId
+    ? data.breakerOptions.find((option) => option.id === selectedBreakerId)
+    : null;
+  const allowedBreakers = selectedSlot
+    ? getAllowedBreakers(data, selectedSlot.id)
+    : [];
+  const filledCount = data.slots.filter((slot) => selections[slot.id]).length;
+  const selectedAmpTotal = data.slots.reduce((sum, slot) => {
+    const breakerId = selections[slot.id];
+    const breaker = breakerId
+      ? data.breakerOptions.find((option) => option.id === breakerId)
+      : null;
+    return sum + (breaker?.amps ?? 0);
+  }, 0);
+  const progressPct =
+    data.slots.length > 0 ? Math.round((filledCount / data.slots.length) * 100) : 0;
+  const projectedAmpTotal = (breaker: BreakerOption | null) => {
+    const currentAmps = selectedBreaker?.amps ?? 0;
+    return selectedAmpTotal - currentAmps + (breaker?.amps ?? 0);
+  };
+  const exceedsFrame = (breaker: BreakerOption | null) =>
+    projectedAmpTotal(breaker) > data.selectedFrame.mainBusAmps;
 
-  const chooseSlot = (slot: PanelSlot) => {
-    setSelectedSlotId(slot.id);
-    setInvalidSlotId(null);
-    setValidationMessage("");
-    setSheetOpen(true);
+  const goToStep = (step: ConfiguratorStep) => {
+    setActiveStep(step);
+    if (step === "breakers" && !breakerStarted) {
+      setBreakerStarted(false);
+    }
   };
 
-  const chooseBreaker = (breaker: BreakerOption | null) => {
+  const openFrameConfiguration = (frameId: string) => {
+    setActiveStep("breakers");
+    setBreakerStarted(false);
+    setPreviewMode(true);
+    setCompleted(false);
+    setWalkIndex(0);
+
+    if (frameId === data.selectedFrame.id) {
+      setActiveStep("breakers");
+      return;
+    }
+
+    router.push(`/configurator?frameId=${frameId}&step=breakers`);
+  };
+
+  const chooseSlot = (slot: PanelSlot) => {
+    const index = data.slots.findIndex((item) => item.id === slot.id);
+    if (index >= 0) setWalkIndex(index);
+    setBreakerStarted(true);
+    setInvalidSlotId(null);
+    setValidationMessage("");
+    setPreviewMode(false);
+    setCompleted(false);
+  };
+
+  const walkTo = (index: number) => {
+    const nextIndex = Math.max(0, Math.min(index, data.slots.length - 1));
+    setWalkIndex(nextIndex);
+    setInvalidSlotId(null);
+    setValidationMessage("");
+    setPreviewMode(false);
+    setCompleted(false);
+  };
+
+  const chooseBreaker = (breaker: BreakerOption | null, autoAdvance = true) => {
     if (!selectedSlot) return;
 
     const validation = validateSelection(data, selectedSlot.id, breaker?.id ?? null);
@@ -69,156 +147,567 @@ export function ConfiguratorWorkspace({
       return;
     }
 
+    if (breaker && exceedsFrame(breaker)) {
+      setInvalidSlotId(selectedSlot.id);
+      setValidationMessage(
+        `This selection would total ${projectedAmpTotal(breaker)}A, above the ${data.selectedFrame.mainBusAmps}A frame limit.`,
+      );
+      return;
+    }
+
     setSelections((current) => ({
       ...current,
       [selectedSlot.id]: breaker?.id ?? null,
     }));
     setInvalidSlotId(null);
     setValidationMessage("");
-  };
+    setCompleted(false);
 
-  const clearAll = () => {
-    if (window.confirm("Clear every breaker selection? Empty slots will keep cover plates in the BOM.")) {
-      setSelections(createDefaultSelections(data));
+    if (breaker && autoAdvance) {
+      window.setTimeout(() => {
+        if (walkIndex < data.slots.length - 1) walkTo(walkIndex + 1);
+      }, 220);
     }
   };
 
-  const duplicateConfiguration = () => {
-    setSaveOpen(true);
+  const clearAll = () => {
+    setClearOpen(true);
   };
 
-  const selectedSlotCards = data.slots
-    .map((slot) => ({
-      slot,
-      breaker: data.breakerOptions.find(
-        (option) => option.id === selections[slot.id],
-      ),
-    }))
-    .filter((item) => item.breaker);
+  const confirmClearAll = () => {
+    setSelections(createDefaultSelections(data));
+    setValidationMessage("");
+    setInvalidSlotId(null);
+    setCompleted(false);
+    setClearOpen(false);
+  };
+
+  const quickFillLower = (amps: number) => {
+    const option = data.breakerOptions.find(
+      (breaker) => breaker.family === "3VA52" && breaker.amps === amps,
+    );
+    if (!option) return;
+    let runningTotal = selectedAmpTotal;
+    const updates: SlotSelection = {};
+    for (const slot of data.slots.filter((item) => item.breakerFamily === "3VA52")) {
+      const currentId = selections[slot.id];
+      const currentBreaker = currentId
+        ? data.breakerOptions.find((breaker) => breaker.id === currentId)
+        : null;
+      const nextTotal = runningTotal - (currentBreaker?.amps ?? 0) + option.amps;
+      if (nextTotal <= data.selectedFrame.mainBusAmps) {
+        updates[slot.id] = option.id;
+        runningTotal = nextTotal;
+      }
+    }
+    setSelections((current) => ({
+      ...current,
+      ...updates,
+    }));
+    if (Object.keys(updates).length === 0) {
+      setValidationMessage(
+        `${amps}A lower breaker fill would exceed the ${data.selectedFrame.mainBusAmps}A frame limit.`,
+      );
+    }
+  };
+
+  const stepIndex = stepOrder.indexOf(activeStep);
+  const stepTab = (
+    step: ConfiguratorStep,
+    label: string,
+    mobileLabel: string,
+    index: number,
+  ) => {
+    const currentIndex = stepOrder.indexOf(step);
+    const done = currentIndex < stepIndex;
+    const active = activeStep === step;
+
+    return (
+      <button
+        key={step}
+        type="button"
+        onClick={() => goToStep(step)}
+        className={`flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 px-1.5 py-2 text-[11px] transition hover:cursor-pointer sm:gap-2 sm:px-4 sm:py-3 sm:text-[13px] ${
+          active
+            ? "text-white"
+            : done
+              ? "text-white/70 hover:text-white"
+              : "text-white/45 hover:text-white/70"
+        }`}
+      >
+        <span
+          className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-semibold sm:size-[22px] sm:text-[11px] ${
+            active
+              ? "border-white bg-white text-primary"
+              : done
+                ? "border-[var(--green)] bg-[var(--green)] text-white"
+                : "border-current"
+          }`}
+        >
+          {done ? <Check className="size-3" /> : index}
+        </span>
+        <span className="min-w-0 truncate sm:hidden">{mobileLabel}</span>
+        <span className="hidden min-w-0 truncate sm:inline">{label}</span>
+      </button>
+    );
+  };
 
   return (
-    <main className="min-h-screen overflow-x-hidden pb-28 md:pb-0">
-      <div className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
-        <header className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-primary">
-              Electro-Matic Products Inc.
-            </p>
-            <h1 className="text-3xl font-semibold">
-              Siemens Panelboard Configurator
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              PROV means provision for future device. Empty slots automatically
-              price cover plates.
-            </p>
-          </div>
-          <div className="grid w-full grid-cols-1 gap-2 min-[420px]:grid-cols-3 md:w-auto md:flex">
-            <Button type="button" variant="secondary" onClick={clearAll}>
-              <RotateCcw className="size-4" />
-              <span className="truncate">Clear all</span>
-            </Button>
-            <Button type="button" variant="secondary" onClick={duplicateConfiguration}>
-              <Copy className="size-4" />
-              <span className="truncate">Duplicate</span>
-            </Button>
-            <Button type="button" onClick={() => setSaveOpen(true)}>
-              <Save className="size-4" />
-              <span className="truncate">Save</span>
-            </Button>
-          </div>
-        </header>
+    <main className="min-h-screen pb-24 md:pb-0">
+      <nav className="sticky top-14 z-20 flex w-full items-stretch bg-[var(--blue-dark)] px-1 shadow-[0_2px_8px_rgba(0,0,0,0.16)] sm:px-6 no-print">
+        {stepTab("frame", "Select Frame", "Frame", 1)}
+        <span className="flex shrink-0 items-center px-0.5 text-sm text-white/20 sm:px-0 sm:text-lg">›</span>
+        {stepTab("breakers", "Configure Breakers", "Breakers", 2)}
+        <span className="flex shrink-0 items-center px-0.5 text-sm text-white/20 sm:px-0 sm:text-lg">›</span>
+        {stepTab("quote", "Review & Quote", "Quote", 3)}
+      </nav>
 
-        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_430px]">
-          <div className="grid min-w-0 gap-5">
+      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-6 sm:py-8">
+        {activeStep === "frame" ? (
+          <section>
             <FrameSelector
               frames={data.frames}
               selectedFrame={data.selectedFrame}
-              onSelectFrame={(frameId) => router.push(`/configurator?frameId=${frameId}`)}
+              onSelectFrame={openFrameConfiguration}
             />
-            <PanelboardGraphic
-              data={data}
-              selections={selections}
-              selectedSlotId={selectedSlotId}
-              invalidSlotId={invalidSlotId}
-              onSelectSlot={chooseSlot}
-            />
+          </section>
+        ) : null}
 
-            <details className="min-w-0 rounded-lg border border-border bg-white p-4 shadow-sm">
-              <summary className="cursor-pointer text-sm font-semibold text-primary">
-                Selected slots
-              </summary>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {selectedSlotCards.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No breakers selected yet.
-                  </p>
-                ) : (
-                  selectedSlotCards.map(({ slot, breaker }) => (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      className="min-w-0 rounded-md border border-border bg-white p-3 text-left shadow-sm"
-                      onClick={() => chooseSlot(slot)}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold">{slot.label}</span>
-                        <Badge>{breaker?.amps}A</Badge>
-                      </div>
-                      <p className="mt-1 break-words text-sm text-muted-foreground">
-                        Circuits {slot.circuitNumbers} • {slot.breakerFamily}
-                      </p>
-                    </button>
-                  ))
-                )}
+        {activeStep === "breakers" && !breakerStarted ? (
+          <section className="flex min-h-[60vh] items-center justify-center px-1 py-8">
+            <div className="grid w-full max-w-[700px] items-center gap-8 rounded-xl border border-border bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.14)] sm:p-10 md:grid-cols-[160px_1fr]">
+              <div className="mx-auto rounded-lg bg-[#2a2a2a] p-4">
+                <svg viewBox="0 0 320 900" className="block h-auto w-[120px]">
+                  <rect x="0" y="0" width="320" height="900" fill="#e8e6e2" />
+                  <rect x="8" y="8" width="304" height="884" fill="#d4d1cc" />
+                  <rect x="14" y="14" width="292" height="872" fill="#f0eeeb" />
+                  <rect x="14" y="14" width="292" height="85" fill="#c8c5bf" />
+                  <rect x="30" y="99" width="260" height="116" fill="#1e4882" rx="3" />
+                  {[241, 279].map((y) =>
+                    [18, 163].map((x) => (
+                      <rect key={`${x}-${y}`} x={x} y={y} width="139" height="36" fill="#e2e0db" rx="2" stroke="#c8c5bf" />
+                    )),
+                  )}
+                  {Array.from({ length: 8 }).map((_, row) =>
+                    [18, 163].map((x) => (
+                      <rect key={`${x}-${row}`} x={x} y={333 + row * 50} width="139" height="48" fill="#e2e0db" rx="2" stroke="#c8c5bf" />
+                    )),
+                  )}
+                  <rect x="14" y="733" width="292" height="139" fill="#c8c5bf" />
+                </svg>
               </div>
-            </details>
+              <div className="text-center md:text-left">
+                <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                  Ready to configure
+                </div>
+                <h2 className="text-2xl font-bold leading-tight text-primary">
+                  {data.selectedFrame.panelType} · {data.selectedFrame.heightInches} in
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {data.selectedFrame.systemVoltage} · {data.selectedFrame.irRating} ·{" "}
+                  {data.selectedFrame.feed} Feed · {data.selectedFrame.mounting} Mount
+                </p>
+                <p className="mt-4 text-sm text-muted-foreground">
+                  {data.slots.length} configurable slots ·{" "}
+                  {data.slots.filter((slot) => slot.breakerFamily === "3VA41").length} top 3VA41 +{" "}
+                  {data.slots.filter((slot) => slot.breakerFamily === "3VA52").length} lower 3VA52
+                </p>
+                <Button
+                  type="button"
+                  className="mt-6 w-full px-8 py-3 text-base sm:w-auto"
+                  onClick={() => {
+                    setBreakerStarted(true);
+                    setPreviewMode(false);
+                    setCompleted(false);
+                    walkTo(0);
+                  }}
+                >
+                  Get Started →
+                </Button>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  You will be guided through each slot one at a time.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
-            <div className="lg:hidden">
+        {activeStep === "breakers" && breakerStarted ? (
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="mb-3 w-fit px-2.5"
+              onClick={() => goToStep("frame")}
+            >
+              <ChevronLeft className="size-4" />
+              Frame
+            </Button>
+
+            <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+              <div className="lg:sticky lg:top-28 lg:self-start">
+                <div className="grid content-start items-start gap-3">
+                <div className="rounded-[6px] border border-border bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)]">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                        Slot Progress
+                      </div>
+                      <div className="mt-0.5 text-sm font-bold">
+                        Slot {walkIndex + 1} of {data.slots.length}
+                      </div>
+                    </div>
+                    <div className="min-w-0 sm:text-right">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                        Frame Load
+                      </div>
+                      <div className="mt-0.5 text-sm font-bold">
+                        {selectedAmpTotal}A / {data.selectedFrame.mainBusAmps}A
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <div className="mb-1 flex justify-between text-[10px] font-semibold text-muted-foreground">
+                        <span>{filledCount} of {data.slots.length} assigned</span>
+                        <span>{progressPct}%</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded bg-border">
+                        <div
+                          className="h-full rounded bg-primary transition-all"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-1 flex justify-between text-[10px] font-semibold text-muted-foreground">
+                        <span>Load</span>
+                        <span>
+                          {Math.min(100, Math.round((selectedAmpTotal / data.selectedFrame.mainBusAmps) * 100))}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded bg-border">
+                        <div
+                          className="h-full rounded bg-primary transition-all"
+                          style={{
+                            width: `${Math.min(100, Math.round((selectedAmpTotal / data.selectedFrame.mainBusAmps) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {data.slots.map((slot, index) => (
+                      <button
+                        key={slot.id}
+                        type="button"
+                        title={slot.circuitNumbers}
+                        onClick={() => walkTo(index)}
+                        className={`h-2.5 min-w-4 flex-1 cursor-pointer rounded-full transition hover:cursor-pointer hover:bg-accent ${
+                          index === walkIndex
+                            ? "bg-accent"
+                            : selections[slot.id]
+                              ? "bg-primary"
+                              : "bg-border"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="pointer-events-none sticky top-12 z-10 -mb-30 flex justify-end px-6 pt-18">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="pointer-events-auto size-10 bg-white/95 p-2 shadow-md"
+                      aria-label={previewMode ? "Minimize panel preview" : "Maximize panel preview"}
+                      title={previewMode ? "Back to Slot" : "Preview Full Panel"}
+                      onClick={() => setPreviewMode((current) => !current)}
+                    >
+                      {previewMode ? (
+                        <Minimize2 className="size-4" />
+                      ) : (
+                        <Maximize2 className="size-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <PanelboardGraphic
+                    data={data}
+                    selections={selections}
+                    selectedSlotId={selectedSlotId}
+                    invalidSlotId={invalidSlotId}
+                    previewMode={previewMode}
+                    completed={completed}
+                    onSelectSlot={chooseSlot}
+                  />
+                </div>
+                {completed ? (
+                  <div className="rounded-[6px] bg-[rgba(20,52,96,0.92)] p-6 text-center text-white shadow-[0_4px_24px_rgba(0,0,0,0.14)]">
+                    <h2 className="text-xl font-bold">Configuration Complete</h2>
+                    <p className="mt-2 text-sm text-white/75">
+                      {filledCount} of {data.slots.length} slots populated ·{" "}
+                      {data.slots.length - filledCount} cover plates
+                    </p>
+                    <Button
+                      type="button"
+                      className="mt-5 bg-white text-primary hover:bg-white/90"
+                      onClick={() => goToStep("quote")}
+                    >
+                      Review & Quote →
+                    </Button>
+                  </div>
+                ) : null}
+                </div>
+              </div>
+
+              <aside className="lg:sticky lg:top-28 lg:self-start">
+              <div className="rounded-[6px] border-2 border-primary/20 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.12),0_12px_32px_rgba(30,72,126,0.12)]">
+                <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                  {selectedSlot?.breakerFamily === "3VA41" ? "Top Zone" : "Lower Zone"}
+                </div>
+                <div className="mt-1 text-[26px] font-bold leading-none text-primary">
+                  Circuit {selectedSlot?.circuitNumbers.split("/")[0]}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {selectedSlot?.breakerFamily} Frame · 3-Pole
+                </div>
+
+                <div className="mt-4 mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                  Select amperage rating:
+                </div>
+                {validationMessage ? (
+                  <div className="mb-3 rounded border border-orange-200 bg-orange-50 p-2 text-xs font-semibold text-danger">
+                    {validationMessage}
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3">
+                  {allowedBreakers.map((breaker) => {
+                    const disabled =
+                      selectedBreakerId !== breaker.id && exceedsFrame(breaker);
+                    return (
+                      <button
+                        key={breaker.id}
+                        type="button"
+                        disabled={disabled}
+                        className={`cursor-pointer rounded-[6px] border-2 px-2 py-3 text-center text-[17px] font-bold transition hover:-translate-y-0.5 hover:cursor-pointer hover:border-primary hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 ${
+                          selectedBreakerId === breaker.id
+                            ? "border-primary bg-[rgba(30,72,126,0.07)] text-primary"
+                            : "border-border bg-background text-foreground"
+                        }`}
+                        title={
+                          disabled
+                            ? `Would exceed ${data.selectedFrame.mainBusAmps}A frame limit`
+                            : undefined
+                        }
+                        onClick={() => chooseBreaker(breaker)}
+                      >
+                        {breaker.amps}A
+                        <span className="mt-1 block text-[9px] font-normal text-muted-foreground">
+                          3-Pole
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedBreaker ? (
+                  <div className="mt-3 flex items-center gap-3 rounded-[6px] border border-[var(--green)] bg-[var(--green-bg)] p-3">
+                    <div className="shrink-0 text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--green)]">
+                      Selected
+                    </div>
+                    <div className="flex-1 leading-tight text-[15px] font-bold text-[var(--green)]">
+                      <div>{selectedBreaker.amps}A</div>
+                      <div className="text-[11px] font-semibold">3-Pole</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded border border-danger/30 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-danger hover:cursor-pointer hover:bg-danger hover:text-white"
+                      onClick={() => chooseBreaker(null, false)}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                ) : null}
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="min-h-9 text-xs"
+                    disabled={walkIndex === 0}
+                    onClick={() => walkTo(walkIndex - 1)}
+                  >
+                    ← Back
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="min-h-9 text-xs"
+                    onClick={() => {
+                      if (walkIndex < data.slots.length - 1) walkTo(walkIndex + 1);
+                      else if (selectedBreaker) {
+                        setCompleted(true);
+                        setPreviewMode(true);
+                      } else {
+                        goToStep("quote");
+                      }
+                    }}
+                  >
+                    {walkIndex === data.slots.length - 1
+                      ? selectedBreaker
+                        ? "Finish →"
+                        : "Skip & Finish →"
+                      : selectedBreaker
+                        ? "Next →"
+                        : "Skip →"}
+                  </Button>
+                </div>
+
+                <div className="mt-4 mb-2 h-1.5 overflow-hidden rounded bg-border">
+                  <div
+                    className="h-full rounded bg-primary transition-all"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{filledCount} of {data.slots.length} assigned</span>
+                  <span className="font-semibold text-foreground">{progressPct}%</span>
+                </div>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="mt-4 min-h-9 w-full text-xs"
+                  onClick={() => setQuickFillOpen((current) => !current)}
+                >
+                  <SlidersHorizontal className="size-3.5" />
+                  Quick Fill
+                </Button>
+                {quickFillOpen ? (
+                  <div className="mt-3 grid gap-2 rounded-[6px] border border-border bg-background p-3">
+                    <Button type="button" size="sm" variant="secondary" className="min-h-9 text-xs" onClick={() => quickFillLower(45)}>
+                      All lower → 45A
+                    </Button>
+                    <Button type="button" size="sm" variant="secondary" className="min-h-9 text-xs" onClick={() => quickFillLower(200)}>
+                      All lower → 200A
+                    </Button>
+                  </div>
+                ) : null}
+                <Button type="button" size="sm" variant="outline" className="mt-2 min-h-9 w-full text-xs text-danger" onClick={clearAll}>
+                  Clear all
+                </Button>
+              </div>
+              </aside>
+            </section>
+          </>
+        ) : null}
+
+        {activeStep === "quote" ? (
+          <section>
+            <h2 className="text-[22px] font-semibold">Configuration Summary</h2>
+            <p className="mt-1 mb-7 text-sm text-muted-foreground">
+              Review your configuration. Pricing reflects selected options.
+            </p>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div>
+                <div className="rounded-[6px] border border-border bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.10),0_4px_12px_rgba(0,0,0,0.06)]">
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Configuration
+                  </div>
+                  <div className="mb-5 break-all rounded-[6px] border border-border bg-background px-4 py-3 font-mono text-base font-bold tracking-normal text-primary">
+                    {data.selectedFrame.catalogNumber}
+                  </div>
+                  <div className="mb-5 rounded-[6px] bg-primary p-5 text-center text-white">
+                    <div className="mb-1 text-xs text-white/70">Total Price</div>
+                    <div className="text-4xl font-bold tracking-normal">
+                      {currency(bom.totalSellPrice)}
+                    </div>
+                    <div className="mt-1 text-[11px] text-white/60">
+                      Configured price · Contact for lead time
+                    </div>
+                  </div>
+                  <div className="text-xs leading-6 text-muted-foreground">
+                    <strong className="text-foreground">
+                      {data.selectedFrame.panelType} · {data.selectedFrame.heightInches} in
+                    </strong>
+                    <br />
+                    {filledCount} of {data.slots.length} slots populated ·{" "}
+                    {data.slots.length - filledCount} cover plates
+                    <br />
+                    {data.selectedFrame.systemVoltage} · 65 KAIC · {data.selectedFrame.mainBusAmps}A Main
+                  </div>
+                </div>
+                <div className="mt-5 flex flex-wrap gap-2 text-sm">
+                  <ExportQuoteButton data={data} bom={bom} />
+                  <button
+                    type="button"
+                    className="inline-flex h-7 cursor-pointer items-center justify-center rounded-[6px] border border-border bg-white px-1.5 text-[9px] font-semibold leading-none text-foreground shadow-sm transition hover:cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    onClick={() => goToStep("breakers")}
+                  >
+                    ← Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-[6px] bg-primary px-1.5 text-[9px] font-semibold leading-none text-primary-foreground shadow-sm transition hover:cursor-pointer hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    onClick={() => setSaveOpen(true)}
+                  >
+                    <Save className="size-3" /> Save
+                  </button>
+                </div>
+                <div className="mt-5">
+                  <ConfigurationSummary data={data} />
+                </div>
+              </div>
               <LiveBom bom={bom} />
             </div>
-          </div>
-
-          <aside className="hidden lg:block">
-            <div className="sticky top-5 grid gap-5">
-              <SlotEditorPanel
-                data={data}
-                selectedSlot={selectedSlot}
-                selectedBreakerId={selectedBreakerId}
-                validationMessage={validationMessage}
-                onChooseBreaker={chooseBreaker}
-              />
-              <ConfigurationSummary data={data} />
-              <ExportQuoteButton data={data} bom={bom} />
-              <LiveBom bom={bom} />
-            </div>
-          </aside>
-        </div>
+          </section>
+        ) : null}
       </div>
 
-      <SlotEditorSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        data={data}
-        selectedSlot={selectedSlot}
-        selectedBreakerId={selectedBreakerId}
-        validationMessage={validationMessage}
-        onChooseBreaker={chooseBreaker}
-      />
       <SaveConfigurationDialog
         open={saveOpen}
         onOpenChange={setSaveOpen}
         data={data}
         selections={selections}
       />
-      <MobileBottomActionBar
-        selectedSlot={selectedSlot}
-        total={bom.totalSellPrice}
-        onChooseBreaker={() => setSheetOpen(true)}
-        onViewBom={() =>
-          document.getElementById("live-bom")?.scrollIntoView({ behavior: "smooth" })
-        }
-        onSave={() => setSaveOpen(true)}
-      />
+      <Dialog open={clearOpen} onOpenChange={setClearOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear breaker selections?</DialogTitle>
+            <DialogDescription>
+              This will remove every selected breaker. Empty slots will keep
+              cover plates in the quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setClearOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={confirmClearAll}>
+              Clear all
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {activeStep !== "frame" ? (
+        <MobileBottomActionBar
+          selectedSlot={selectedSlot}
+          total={bom.totalSellPrice}
+          onChooseBreaker={() => {
+            setActiveStep("breakers");
+            setBreakerStarted(true);
+          }}
+          onViewBom={() => setActiveStep("quote")}
+          onSave={() => setSaveOpen(true)}
+        />
+      ) : null}
     </main>
   );
 }

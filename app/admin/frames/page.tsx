@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAdminCatalog } from "@/lib/db/queries";
 import { currency } from "@/lib/utils";
+import { marginFromCostSell } from "@/lib/pricing";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { AdminFrameForm } from "@/components/admin/AdminFrameForm";
 import { DeleteRecordButton } from "@/components/admin/DeleteRecordButton";
@@ -26,7 +27,13 @@ export default async function AdminFramesPage() {
             { key: "catalog", header: "Catalog", render: (row) => row.catalogNumber },
             { key: "type", header: "Type", render: (row) => row.panelType },
             { key: "bus", header: "Bus", render: (row) => `${row.mainBusAmps}A` },
+            { key: "cost", header: "Cost", render: (row) => currency(row.baseCost) },
             { key: "sell", header: "Sell", render: (row) => currency(row.baseSellPrice) },
+            {
+              key: "margin",
+              header: "Margin",
+              render: (row) => `${(marginFromCostSell(row.baseCost, row.baseSellPrice) * 100).toFixed(1)}%`,
+            },
             {
               key: "active",
               header: "Status",

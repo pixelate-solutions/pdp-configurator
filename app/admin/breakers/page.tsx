@@ -1,5 +1,6 @@
 import { getAdminCatalog } from "@/lib/db/queries";
 import { currency } from "@/lib/utils";
+import { marginFromCostSell } from "@/lib/pricing";
 import { AdminBreakerForm } from "@/components/admin/AdminBreakerForm";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { DeleteRecordButton } from "@/components/admin/DeleteRecordButton";
@@ -26,6 +27,11 @@ export default async function AdminBreakersPage() {
             { key: "type", header: "Type", render: (row) => row.type },
             { key: "cost", header: "Cost", render: (row) => currency(row.cost) },
             { key: "sell", header: "Sell", render: (row) => currency(row.sellPrice) },
+            {
+              key: "margin",
+              header: "Margin",
+              render: (row) => `${(marginFromCostSell(row.cost, row.sellPrice) * 100).toFixed(1)}%`,
+            },
             {
               key: "active",
               header: "Status",

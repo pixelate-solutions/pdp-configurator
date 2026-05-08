@@ -1,5 +1,6 @@
 import { getAdminCatalog } from "@/lib/db/queries";
 import { currency } from "@/lib/utils";
+import { marginFromCostSell } from "@/lib/pricing";
 import { AdminAccessoryForm } from "@/components/admin/AdminAccessoryForm";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { DeleteRecordButton } from "@/components/admin/DeleteRecordButton";
@@ -23,7 +24,13 @@ export default async function AdminAccessoriesPage() {
             { key: "name", header: "Name", render: (row) => row.name },
             { key: "catalog", header: "Catalog", render: (row) => row.catalogNumber },
             { key: "required", header: "Rule", render: (row) => row.isRequired ? "Required" : "Optional" },
+            { key: "cost", header: "Cost", render: (row) => currency(row.cost) },
             { key: "sell", header: "Sell", render: (row) => currency(row.sellPrice) },
+            {
+              key: "margin",
+              header: "Margin",
+              render: (row) => `${(marginFromCostSell(row.cost, row.sellPrice) * 100).toFixed(1)}%`,
+            },
             {
               key: "active",
               header: "Status",

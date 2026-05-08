@@ -26,10 +26,10 @@ export function SlotEditorPanel({
   if (!selectedSlot) {
     return (
       <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
-        <p className="text-sm font-semibold text-primary">3. Select amperage</p>
+        <p className="text-sm font-semibold text-primary">Breaker choice</p>
         <div className="mt-4 rounded-md bg-muted p-4 text-sm leading-6 text-muted-foreground">
-          Tap a breaker slot on the panelboard to choose an amperage or leave it
-          empty for a cover plate.
+          Select a slot on the panelboard, then choose one allowed amperage.
+          Empty slots automatically include the correct cover.
         </div>
       </section>
     );
@@ -41,7 +41,7 @@ export function SlotEditorPanel({
     <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-primary">3. Select amperage</p>
+          <p className="text-sm font-semibold text-primary">Breaker choice</p>
           <h2 className="mt-1 text-xl font-semibold">{selectedSlot.label}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Circuits {selectedSlot.circuitNumbers}
@@ -81,7 +81,7 @@ export function SlotEditorPanel({
 
       <details className="mt-4 rounded-md border border-border bg-muted p-3">
         <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
-          <Info className="size-4" /> Details
+          <Info className="size-4" /> Technical details
         </summary>
         <dl className="mt-3 grid gap-2 text-sm text-muted-foreground">
           <div className="flex justify-between gap-4">

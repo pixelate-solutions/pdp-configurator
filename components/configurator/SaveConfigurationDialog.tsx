@@ -31,9 +31,9 @@ export function SaveConfigurationDialog({
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({
-    name: "Fori 90 in P5 quote",
-    customerName: "Fori / Electro-Matic Products Inc.",
-    projectName: "Fori PDP",
+    name: `${data.selectedFrame.heightInches} in ${data.selectedFrame.panelType} quote`,
+    customerName: "",
+    projectName: "",
     notes: "",
   });
 
@@ -61,7 +61,7 @@ export function SaveConfigurationDialog({
         <DialogHeader>
           <DialogTitle>Save configuration</DialogTitle>
           <DialogDescription>
-            Save the current slot selections and live BOM as a quote-ready
+            Save the current slot selections and customer quote as a
             configuration.
           </DialogDescription>
         </DialogHeader>

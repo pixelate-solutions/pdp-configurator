@@ -150,6 +150,16 @@ export const frameAccessories = pgTable("frame_accessories", {
   ruleType: text("rule_type").notNull().default("required"),
 });
 
+export const adminSettings = pgTable("admin_settings", {
+  id: text("id").primaryKey(),
+  defaultMargin: numeric("default_margin", {
+    precision: 5,
+    scale: 4,
+    mode: "number",
+  }).notNull().default(0.34),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const configurations = pgTable("configurations", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
