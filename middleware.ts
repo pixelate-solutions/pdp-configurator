@@ -1,6 +1,17 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
+import { isClerkConfigured } from "@/lib/clerk-config";
 
-export default clerkMiddleware();
+const optionalClerkMiddleware = clerkMiddleware();
+
+export default function middleware(request: NextRequest, event: NextFetchEvent) {
+  if (!isClerkConfigured()) {
+    return NextResponse.next();
+  }
+
+  return optionalClerkMiddleware(request, event);
+}
 
 export const config = {
   matcher: [

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { isClerkConfigured } from "@/lib/clerk-config";
 import type { PricingAccess } from "@/lib/pricing-access";
 
 type ClerkEmailAddress = {
@@ -19,7 +20,7 @@ function primaryVerifiedEmail(
 }
 
 export async function getPricingAccess(): Promise<PricingAccess> {
-  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+  const clerkEnabled = isClerkConfigured();
   if (!clerkEnabled) {
     return {
       clerkEnabled: false,
@@ -53,7 +54,7 @@ export async function getPricingAccess(): Promise<PricingAccess> {
 }
 
 export async function assertAdmin() {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return;
+  if (!isClerkConfigured()) return;
 
   const { userId, sessionClaims } = await auth();
   if (!userId) redirect("/");

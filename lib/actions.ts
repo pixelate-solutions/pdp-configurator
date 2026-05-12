@@ -9,6 +9,7 @@ import { buildBom } from "@/lib/bom";
 import { getConfiguratorData } from "@/lib/db/queries";
 import { getDb } from "@/lib/db/client";
 import { sendPricingRequestEmail } from "@/lib/pricing-request-email";
+import { isClerkConfigured } from "@/lib/clerk-config";
 import {
   adminSettings,
   accessories,
@@ -49,7 +50,7 @@ export async function saveConfigurationAction(input: unknown) {
     };
   }
 
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  if (!isClerkConfigured()) {
     return {
       ok: false,
       message: "Configure Clerk keys before saving authenticated quotes.",
@@ -122,7 +123,7 @@ export async function requestPricingAction(input: unknown) {
     return { ok: false, message: "Review the configuration before requesting pricing." };
   }
 
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  if (!isClerkConfigured()) {
     return {
       ok: false,
       message: "Configure Clerk keys before requesting pricing.",

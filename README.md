@@ -45,6 +45,8 @@ ADMIN_CLERK_USER_IDS="user_xxx,user_yyy"
 
 Admin routes under `/admin` are protected when Clerk is configured. Admin access is granted when the Clerk user ID is listed in `ADMIN_CLERK_USER_IDS` or the Clerk session metadata/public metadata has `role: "admin"`.
 
+On Vercel, set both `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` for the Production environment. If either key is missing, Clerk is treated as disabled so middleware does not fail before the app renders.
+
 ## Routes
 
 - `/` landing page
