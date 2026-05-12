@@ -1,5 +1,56 @@
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import type { PricingAccess } from "@/lib/pricing-access";
+
+type ClerkEmailAddress = {
+  emailAddress?: string | null;
+  verification?: {
+    status?: string | null;
+  } | null;
+};
+
+function primaryVerifiedEmail(
+  emailAddress: ClerkEmailAddress | null | undefined,
+) {
+  return {
+    email: emailAddress?.emailAddress ?? null,
+    emailVerified: emailAddress?.verification?.status === "verified",
+  };
+}
+
+export async function getPricingAccess(): Promise<PricingAccess> {
+  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+  if (!clerkEnabled) {
+    return {
+      clerkEnabled: false,
+      signedIn: false,
+      emailVerified: false,
+      email: null,
+    };
+  }
+
+  const { userId } = await auth();
+  if (!userId) {
+    return {
+      clerkEnabled: true,
+      signedIn: false,
+      emailVerified: false,
+      email: null,
+    };
+  }
+
+  const user = await currentUser();
+  const { email, emailVerified } = primaryVerifiedEmail(
+    user?.primaryEmailAddress as ClerkEmailAddress | null | undefined,
+  );
+
+  return {
+    clerkEnabled: true,
+    signedIn: true,
+    emailVerified,
+    email,
+  };
+}
 
 export async function assertAdmin() {
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return;

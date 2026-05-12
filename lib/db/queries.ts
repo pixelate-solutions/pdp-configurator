@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   adminSettings,
@@ -27,6 +27,33 @@ import {
 } from "@/lib/seed-data";
 import { createDefaultSelections } from "@/lib/bom";
 import { DEFAULT_ADMIN_MARGIN, sellPriceFromCost } from "@/lib/pricing";
+
+export type SavedConfigurationImportOption = {
+  id: string;
+  name: string;
+  customerName: string;
+  projectName: string;
+  createdAt: string;
+};
+
+function isMissingDatabaseError(error: unknown) {
+  const cause = error instanceof Error ? error.cause : undefined;
+  return (
+    typeof cause === "object" &&
+    cause !== null &&
+    "code" in cause &&
+    cause.code === "3D000"
+  );
+}
+
+function logSeedFallback(context: string, error: unknown) {
+  if (isMissingDatabaseError(error)) {
+    console.warn(`${context}: local database is unavailable; using seeded data.`);
+    return;
+  }
+
+  console.error(`${context}:`, error);
+}
 
 async function getPricingMargin() {
   const db = getDb();
@@ -134,7 +161,7 @@ export async function getConfiguratorData(frameId?: string): Promise<Configurato
       frameAccessories: linkedAccessories,
     }, margin);
   } catch (error) {
-    console.error("Falling back to seeded configurator data:", error);
+    logSeedFallback("Falling back to seeded configurator data", error);
     return applyMargin(getFallbackConfiguratorData(frameId), margin);
   }
 }
@@ -189,8 +216,36 @@ export async function getSavedConfiguration(id: string) {
 
     return { configuration, data, selections, items };
   } catch (error) {
-    console.error("Unable to load saved configuration:", error);
+    logSeedFallback("Unable to load saved configuration", error);
     return null;
+  }
+}
+
+export async function getSavedConfigurationImportOptions(): Promise<
+  SavedConfigurationImportOption[]
+> {
+  const db = getDb();
+  if (!db) return [];
+
+  try {
+    const savedConfigurations = await db
+      .select({
+        id: configurations.id,
+        name: configurations.name,
+        customerName: configurations.customerName,
+        projectName: configurations.projectName,
+        createdAt: configurations.createdAt,
+      })
+      .from(configurations)
+      .orderBy(desc(configurations.createdAt));
+
+    return savedConfigurations.map((configuration) => ({
+      ...configuration,
+      createdAt: configuration.createdAt.toISOString(),
+    }));
+  } catch (error) {
+    logSeedFallback("Unable to load saved configurations", error);
+    return [];
   }
 }
 
@@ -256,7 +311,7 @@ export async function getAdminCatalog() {
       defaultMargin,
     };
   } catch (error) {
-    console.error("Falling back to seeded admin catalog:", error);
+    logSeedFallback("Falling back to seeded admin catalog", error);
     return getFallbackAdminCatalog(defaultMargin);
   }
 }

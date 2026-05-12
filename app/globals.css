@@ -45,6 +45,8 @@ html {
   min-height: 100%;
   background: var(--background);
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
 }
 
 body {
@@ -52,11 +54,16 @@ body {
   min-height: 100%;
   margin: 0;
   color: var(--foreground);
-  background:
-    linear-gradient(120deg, rgba(242, 183, 5, 0.09), transparent 30%),
-    linear-gradient(180deg, #eef6fb 0%, #f7f9fc 40%, #f6f8fb 100%);
+  background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
   text-rendering: geometricPrecision;
+}
+
+body[data-scroll-locked][data-scroll-locked] {
+  overflow: auto !important;
+  overscroll-behavior: auto !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
 }
 
 button,
@@ -68,19 +75,6 @@ textarea {
 
 ::selection {
   background: rgba(43, 129, 191, 0.2);
-}
-
-body::before {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  content: "";
-  background-image:
-    linear-gradient(rgba(26, 83, 141, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(26, 83, 141, 0.055) 1px, transparent 1px);
-  background-size: 52px 52px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.78), transparent 78%);
 }
 
 :where(button, a, input, textarea, summary) {
@@ -107,6 +101,10 @@ body::before {
   backdrop-filter: blur(22px) saturate(1.2);
 }
 
+.glass-panel.fixed {
+  position: fixed;
+}
+
 .glass-panel::before {
   position: absolute;
   inset: 0;
@@ -120,6 +118,11 @@ body::before {
 
 .glass-panel > * {
   position: relative;
+  z-index: 1;
+}
+
+.glass-panel > .absolute {
+  position: absolute;
 }
 
 .liquid-surface {
@@ -160,6 +163,21 @@ body::before {
   transform: translateY(1px) scale(0.99);
 }
 
+.price-request-cta {
+  transform: translateY(0) scale(1);
+  transition:
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.price-request-cta:hover {
+  transform: translateY(-2px) scale(1.015);
+}
+
+.price-request-cta:active {
+  transform: translateY(0) scale(0.995);
+}
+
 .soft-progress {
   background: linear-gradient(90deg, var(--primary), var(--blue-light), var(--accent));
   box-shadow: 0 0 18px rgba(43, 129, 191, 0.28);
@@ -169,26 +187,15 @@ body::before {
   animation: rise-in 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-@supports (animation-timeline: view()) {
-  .scroll-rise,
-  main :where(section, article, details, form) {
-    animation: rise-in both;
-    animation-timeline: view();
-    animation-range: entry 0% cover 24%;
-  }
-}
-
 @keyframes rise-in {
   from {
     opacity: 0;
     transform: translateY(18px) scale(0.985);
-    filter: blur(6px);
   }
 
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-    filter: blur(0);
   }
 }
 
@@ -218,7 +225,6 @@ body::before {
     background: white;
   }
 
-  body::before,
   .glass-panel::before {
     display: none;
   }

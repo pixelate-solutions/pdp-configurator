@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  ChevronLeft,
+  LockKeyhole,
   Maximize2,
   Minimize2,
   Save,
-  SlidersHorizontal,
 } from "lucide-react";
 import type {
   BreakerOption,
@@ -16,13 +16,15 @@ import type {
   PanelSlot,
   SlotSelection,
 } from "@/lib/configurator-types";
+import type { SavedConfigurationImportOption } from "@/lib/db/queries";
+import type { PricingAccess } from "@/lib/pricing-access";
 import {
   buildBom,
   createDefaultSelections,
   getAllowedBreakers,
   validateSelection,
 } from "@/lib/bom";
-import { currency } from "@/lib/utils";
+import { maskedPrice } from "@/lib/pricing-access";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,40 +36,139 @@ import {
 import { FrameSelector } from "@/components/configurator/FrameSelector";
 import { PanelboardGraphic } from "@/components/configurator/PanelboardGraphic";
 import { LiveBom } from "@/components/configurator/LiveBom";
-import { MobileBottomActionBar } from "@/components/configurator/MobileBottomActionBar";
 import { ConfigurationSummary } from "@/components/configurator/ConfigurationSummary";
 import { SaveConfigurationDialog } from "@/components/configurator/SaveConfigurationDialog";
-import { ExportQuoteButton } from "@/components/configurator/ExportQuoteButton";
+import { RequestPricingButton } from "@/components/configurator/RequestPricingButton";
 
 type ConfiguratorStep = "frame" | "breakers" | "quote";
 
 const stepOrder: ConfiguratorStep[] = ["frame", "breakers", "quote"];
+const pendingReviewStorageKey = "pdp-configurator-pending-review";
+const defaultPricingAccess: PricingAccess = {
+  clerkEnabled: false,
+  signedIn: false,
+  emailVerified: false,
+  email: null,
+};
+
+function readPendingReviewSelections(frameId: string, step: ConfiguratorStep) {
+  if (step !== "quote" || typeof window === "undefined") return null;
+
+  const stored = window.sessionStorage.getItem(pendingReviewStorageKey);
+  if (!stored) return null;
+
+  try {
+    const parsed = JSON.parse(stored) as {
+      frameId?: string;
+      selections?: SlotSelection;
+    };
+    if (parsed.frameId === frameId && parsed.selections) return parsed.selections;
+  } catch {
+    window.sessionStorage.removeItem(pendingReviewStorageKey);
+  }
+
+  return null;
+}
+
+function PricingGateActions({
+  pricingAccess,
+  returnUrl,
+  onBeforeAuth,
+}: {
+  pricingAccess: PricingAccess;
+  returnUrl: string;
+  onBeforeAuth: () => void;
+}) {
+  if (!pricingAccess.clerkEnabled) {
+    return (
+      <p className="text-center text-xs font-semibold text-danger">
+        Configure Clerk to enable account creation and pricing requests.
+      </p>
+    );
+  }
+
+  if (!pricingAccess.signedIn) {
+    return (
+      <div className="grid gap-2 rounded-[1.75rem] border border-primary/18 bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(232,244,255,0.84))] p-3 shadow-[0_18px_42px_rgba(26,83,141,0.16)]">
+        <SignUpButton
+          mode="modal"
+          forceRedirectUrl={returnUrl}
+          fallbackRedirectUrl={returnUrl}
+          signInForceRedirectUrl={returnUrl}
+          signInFallbackRedirectUrl={returnUrl}
+        >
+          <Button
+            type="button"
+            size="lg"
+            className="price-request-cta group min-h-14 w-full rounded-[1.4rem] bg-[linear-gradient(135deg,var(--primary),var(--blue-light))] text-base shadow-[0_16px_34px_rgba(26,83,141,0.34)] hover:shadow-[0_22px_48px_rgba(26,83,141,0.4)]"
+            onClick={onBeforeAuth}
+          >
+            <LockKeyhole className="size-5 transition group-hover:-translate-y-0.5" />
+            Create account to request price
+          </Button>
+        </SignUpButton>
+        <SignInButton
+          mode="modal"
+          forceRedirectUrl={returnUrl}
+          fallbackRedirectUrl={returnUrl}
+          signUpForceRedirectUrl={returnUrl}
+          signUpFallbackRedirectUrl={returnUrl}
+        >
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            onClick={onBeforeAuth}
+          >
+            Sign in to request pricing
+          </Button>
+        </SignInButton>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 text-center">
+      <p className="text-xs font-semibold text-muted-foreground">
+        Your account is ready. Send this configuration to request pricing.
+      </p>
+    </div>
+  );
+}
 
 export function ConfiguratorWorkspace({
   data,
+  pricingAccess = defaultPricingAccess,
+  savedConfigurations = [],
   initialSelections,
   initialStep = "frame",
 }: {
   data: ConfiguratorData;
+  pricingAccess?: PricingAccess;
+  savedConfigurations?: SavedConfigurationImportOption[];
   initialSelections?: SlotSelection;
   initialStep?: ConfiguratorStep;
 }) {
   const router = useRouter();
   const [selections, setSelections] = useState<SlotSelection>(
-    initialSelections ?? createDefaultSelections(data),
+    () =>
+      initialSelections ??
+      readPendingReviewSelections(data.selectedFrame.id, initialStep) ??
+      createDefaultSelections(data),
   );
   const [activeStep, setActiveStep] = useState<ConfiguratorStep>(initialStep);
-  const [breakerStarted, setBreakerStarted] = useState(false);
+  const [breakerStarted, setBreakerStarted] = useState(initialStep === "quote");
   const [walkIndex, setWalkIndex] = useState(0);
   const [invalidSlotId, setInvalidSlotId] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
-  const [quickFillOpen, setQuickFillOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState(true);
   const [completed, setCompleted] = useState(false);
 
   const bom = useMemo(() => buildBom(data, selections), [data, selections]);
+  const canRequestPricing = pricingAccess.signedIn;
+  const quoteReturnUrl = `/configurator?frameId=${data.selectedFrame.id}&step=quote`;
   const selectedSlot = data.slots[walkIndex] ?? data.slots[0] ?? null;
   const selectedSlotId = selectedSlot?.id ?? null;
   const selectedBreakerId = selectedSlot
@@ -95,6 +196,16 @@ export function ConfiguratorWorkspace({
   };
   const exceedsFrame = (breaker: BreakerOption | null) =>
     projectedAmpTotal(breaker) > data.selectedFrame.mainBusAmps;
+
+  const persistReviewState = () => {
+    window.sessionStorage.setItem(
+      pendingReviewStorageKey,
+      JSON.stringify({
+        frameId: data.selectedFrame.id,
+        selections,
+      }),
+    );
+  };
 
   const goToStep = (step: ConfiguratorStep) => {
     setActiveStep(step);
@@ -124,7 +235,6 @@ export function ConfiguratorWorkspace({
     setBreakerStarted(true);
     setInvalidSlotId(null);
     setValidationMessage("");
-    setPreviewMode(false);
     setCompleted(false);
   };
 
@@ -133,7 +243,6 @@ export function ConfiguratorWorkspace({
     setWalkIndex(nextIndex);
     setInvalidSlotId(null);
     setValidationMessage("");
-    setPreviewMode(false);
     setCompleted(false);
   };
 
@@ -182,33 +291,12 @@ export function ConfiguratorWorkspace({
     setClearOpen(false);
   };
 
-  const quickFillLower = (amps: number) => {
-    const option = data.breakerOptions.find(
-      (breaker) => breaker.family === "3VA52" && breaker.amps === amps,
-    );
-    if (!option) return;
-    let runningTotal = selectedAmpTotal;
-    const updates: SlotSelection = {};
-    for (const slot of data.slots.filter((item) => item.breakerFamily === "3VA52")) {
-      const currentId = selections[slot.id];
-      const currentBreaker = currentId
-        ? data.breakerOptions.find((breaker) => breaker.id === currentId)
-        : null;
-      const nextTotal = runningTotal - (currentBreaker?.amps ?? 0) + option.amps;
-      if (nextTotal <= data.selectedFrame.mainBusAmps) {
-        updates[slot.id] = option.id;
-        runningTotal = nextTotal;
-      }
-    }
-    setSelections((current) => ({
-      ...current,
-      ...updates,
-    }));
-    if (Object.keys(updates).length === 0) {
-      setValidationMessage(
-        `${amps}A lower breaker fill would exceed the ${data.selectedFrame.mainBusAmps}A frame limit.`,
-      );
-    }
+  const finishWithCovers = () => {
+    setValidationMessage("");
+    setInvalidSlotId(null);
+    setCompleted(true);
+    setPreviewMode(true);
+    goToStep("quote");
   };
 
   const stepIndex = stepOrder.indexOf(activeStep);
@@ -253,7 +341,7 @@ export function ConfiguratorWorkspace({
   };
 
   return (
-    <main className="min-h-screen pb-24 md:pb-0">
+    <main className="min-h-screen">
       <nav className="no-print sticky top-14 z-20 flex w-full items-center gap-1 border-b border-white/12 bg-[rgba(20,64,118,0.84)] px-1.5 py-1.5 shadow-[0_10px_28px_rgba(20,64,118,0.18)] backdrop-blur-xl sm:px-6">
         {stepTab("frame", "Select Frame", "Frame", 1)}
         <span className="flex shrink-0 items-center px-0.5 text-sm text-white/20 sm:px-0 sm:text-lg">›</span>
@@ -268,6 +356,7 @@ export function ConfiguratorWorkspace({
             <FrameSelector
               frames={data.frames}
               selectedFrame={data.selectedFrame}
+              savedConfigurations={savedConfigurations}
               onSelectFrame={openFrameConfiguration}
             />
           </section>
@@ -334,19 +423,8 @@ export function ConfiguratorWorkspace({
 
         {activeStep === "breakers" && breakerStarted ? (
           <>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="mb-3 w-fit px-2.5"
-              onClick={() => goToStep("frame")}
-            >
-              <ChevronLeft className="size-4" />
-              Frame
-            </Button>
-
             <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-              <div className="lg:sticky lg:top-28 lg:self-start">
+              <div className="order-2 lg:order-1 lg:sticky lg:top-28 lg:self-start">
                 <div className="grid content-start items-start gap-3">
                 <div className="liquid-surface rounded-3xl p-4">
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -375,7 +453,7 @@ export function ConfiguratorWorkspace({
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-primary/10">
                         <div
-                          className="soft-progress h-full rounded-full transition-all duration-500"
+                          className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>
@@ -389,30 +467,13 @@ export function ConfiguratorWorkspace({
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-primary/10">
                         <div
-                          className="soft-progress h-full rounded-full transition-all duration-500"
+                          className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
                           style={{
                             width: `${Math.min(100, Math.round((selectedAmpTotal / data.selectedFrame.mainBusAmps) * 100))}%`,
                           }}
                         />
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {data.slots.map((slot, index) => (
-                      <button
-                        key={slot.id}
-                        type="button"
-                        title={slot.circuitNumbers}
-                        onClick={() => walkTo(index)}
-                        className={`pressable h-3 min-w-4 flex-1 cursor-pointer rounded-full transition hover:cursor-pointer hover:bg-accent ${
-                          index === walkIndex
-                            ? "bg-accent"
-                            : selections[slot.id]
-                              ? "bg-primary"
-                              : "bg-border"
-                        }`}
-                      />
-                    ))}
                   </div>
                 </div>
                 <div className="relative">
@@ -461,8 +522,8 @@ export function ConfiguratorWorkspace({
                 </div>
               </div>
 
-              <aside className="lg:sticky lg:top-28 lg:self-start">
-              <div className="glass-panel rounded-[2rem] p-4">
+              <aside className="order-1 lg:order-2 lg:sticky lg:top-44 lg:self-start">
+              <div className="glass-panel rounded-4xl p-4 text-sm">
                 <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   {selectedSlot?.breakerFamily === "3VA41" ? "Top Zone" : "Lower Zone"}
                 </div>
@@ -493,7 +554,7 @@ export function ConfiguratorWorkspace({
                         className={`pressable cursor-pointer rounded-2xl border-2 px-2 py-3 text-center text-[17px] font-bold transition hover:cursor-pointer hover:border-primary hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 ${
                           selectedBreakerId === breaker.id
                             ? "border-primary bg-[rgba(43,129,191,0.12)] text-primary shadow-[0_10px_24px_rgba(26,83,141,0.12)]"
-                            : "border-white/70 bg-white/68 text-foreground"
+                            : "border-gray-200 text-foreground"
                         }`}
                         title={
                           disabled
@@ -530,7 +591,7 @@ export function ConfiguratorWorkspace({
                   </div>
                 ) : null}
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                   <Button
                     type="button"
                     variant="secondary"
@@ -564,10 +625,19 @@ export function ConfiguratorWorkspace({
                         : "Skip →"}
                   </Button>
                 </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="mt-2 min-h-9 w-full text-xs"
+                  onClick={finishWithCovers}
+                >
+                  Finish with cover plates →
+                </Button>
 
                 <div className="mt-4 mb-2 h-2 overflow-hidden rounded-full bg-primary/10">
                   <div
-                    className="soft-progress h-full rounded-full transition-all duration-500"
+                    className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
@@ -576,26 +646,6 @@ export function ConfiguratorWorkspace({
                   <span className="font-semibold text-foreground">{progressPct}%</span>
                 </div>
 
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="mt-4 min-h-9 w-full text-xs"
-                  onClick={() => setQuickFillOpen((current) => !current)}
-                >
-                  <SlidersHorizontal className="size-3.5" />
-                  Quick Fill
-                </Button>
-                {quickFillOpen ? (
-                  <div className="mt-3 grid gap-2 rounded-2xl border border-white/70 bg-white/58 p-3 backdrop-blur">
-                    <Button type="button" size="sm" variant="secondary" className="min-h-9 text-xs" onClick={() => quickFillLower(45)}>
-                      All lower → 45A
-                    </Button>
-                    <Button type="button" size="sm" variant="secondary" className="min-h-9 text-xs" onClick={() => quickFillLower(200)}>
-                      All lower → 200A
-                    </Button>
-                  </div>
-                ) : null}
                 <Button type="button" size="sm" variant="outline" className="mt-2 min-h-9 w-full text-xs text-danger" onClick={clearAll}>
                   Clear all
                 </Button>
@@ -609,7 +659,7 @@ export function ConfiguratorWorkspace({
           <section>
             <h2 className="text-[22px] font-semibold">Configuration Summary</h2>
             <p className="mt-1 mb-7 text-sm text-muted-foreground">
-              Review your configuration. Pricing reflects selected options.
+              Review your configuration and request verified pricing.
             </p>
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
@@ -622,12 +672,26 @@ export function ConfiguratorWorkspace({
                   </div>
                   <div className="mb-5 rounded-[1.75rem] bg-primary p-5 text-center text-white shadow-[0_18px_40px_rgba(26,83,141,0.24)]">
                     <div className="mb-1 text-xs text-white/70">Total Price</div>
-                    <div className="text-4xl font-bold tracking-normal">
-                      {currency(bom.totalSellPrice)}
+                    <div className="select-none text-4xl font-bold tracking-normal blur-[7px]">
+                      {maskedPrice}
                     </div>
                     <div className="mt-1 text-[11px] text-white/60">
-                      Configured price · Contact for lead time
+                      Hidden until your pricing request is reviewed
                     </div>
+                  </div>
+                  <div className="mb-5 rounded-3xl border border-white/70 bg-white/62 p-4 backdrop-blur">
+                    {canRequestPricing ? (
+                      <RequestPricingButton
+                        frameId={data.selectedFrame.id}
+                        selections={selections}
+                      />
+                    ) : (
+                      <PricingGateActions
+                        pricingAccess={pricingAccess}
+                        returnUrl={quoteReturnUrl}
+                        onBeforeAuth={persistReviewState}
+                      />
+                    )}
                   </div>
                   <div className="text-xs leading-6 text-muted-foreground">
                     <strong className="text-foreground">
@@ -641,27 +705,19 @@ export function ConfiguratorWorkspace({
                   </div>
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2 text-sm">
-                  <ExportQuoteButton data={data} bom={bom} />
                   <button
                     type="button"
-                    className="pressable inline-flex h-8 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-white/78 px-3 text-[10px] font-semibold leading-none text-foreground shadow-sm backdrop-blur transition hover:cursor-pointer hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    onClick={() => goToStep("breakers")}
-                  >
-                    ← Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="pressable inline-flex h-8 cursor-pointer items-center justify-center gap-1 rounded-full bg-primary px-3 text-[10px] font-semibold leading-none text-primary-foreground shadow-sm transition hover:cursor-pointer hover:bg-[var(--blue-light)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="pressable inline-flex h-10 w-full cursor-pointer items-center justify-center gap-1 rounded-full bg-primary px-3 text-xs font-semibold leading-none text-primary-foreground shadow-sm transition hover:cursor-pointer hover:bg-[var(--blue-light)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     onClick={() => setSaveOpen(true)}
                   >
                     <Save className="size-3" /> Save
                   </button>
                 </div>
-                <div className="mt-5">
-                  <ConfigurationSummary data={data} />
-                </div>
               </div>
-              <LiveBom bom={bom} />
+              <div className="grid gap-5">
+                <LiveBom bom={bom} />
+                <ConfigurationSummary data={data} />
+              </div>
             </div>
           </section>
         ) : null}
@@ -674,40 +730,34 @@ export function ConfiguratorWorkspace({
         selections={selections}
       />
       <Dialog open={clearOpen} onOpenChange={setClearOpen}>
-        <DialogContent className="bg-white/80 rounded-[2rem] p-6 text-center">
-          <DialogHeader>
+        <DialogContent className="max-w-xl rounded-[2rem] bg-white/80 px-6 pb-8 pt-14 text-center sm:px-10">
+          <DialogHeader className="mx-auto mb-7 max-w-md pr-0">
             <DialogTitle>Clear breaker selections?</DialogTitle>
             <DialogDescription>
               This will remove every selected breaker. Empty slots will keep
               cover plates in the quote.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse items-stretch justify-center gap-3 sm:flex-row sm:items-center">
             <Button
               type="button"
               variant="secondary"
+              className="min-w-36"
               onClick={() => setClearOpen(false)}
             >
               Cancel
             </Button>
-            <Button type="button" variant="danger" onClick={confirmClearAll}>
+            <Button
+              type="button"
+              variant="danger"
+              className="min-w-36"
+              onClick={confirmClearAll}
+            >
               Clear all
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-      {activeStep !== "frame" ? (
-        <MobileBottomActionBar
-          selectedSlot={selectedSlot}
-          total={bom.totalSellPrice}
-          onChooseBreaker={() => {
-            setActiveStep("breakers");
-            setBreakerStarted(true);
-          }}
-          onViewBom={() => setActiveStep("quote")}
-          onSave={() => setSaveOpen(true)}
-        />
-      ) : null}
     </main>
   );
 }

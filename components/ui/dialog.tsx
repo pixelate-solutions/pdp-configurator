@@ -28,7 +28,7 @@ export function DialogContent({
         <DialogPrimitive.Close asChild>
           <Button
             aria-label="Close"
-            className="absolute right-3 top-3"
+            className="absolute right-4 top-4 z-10 size-10 bg-white/72 shadow-[0_10px_24px_rgba(24,48,74,0.12)] backdrop-blur hover:bg-white"
             size="icon"
             variant="ghost"
           >
@@ -41,7 +41,7 @@ export function DialogContent({
 }
 
 export function DialogHeader(props: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className="mb-4 pr-8" {...props} />;
+  return <div {...props} className={cn("mb-4 pr-10", props.className)} />;
 }
 
 export function DialogTitle(

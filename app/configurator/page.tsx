@@ -1,5 +1,9 @@
 import { ConfiguratorWorkspace } from "@/components/configurator/ConfiguratorWorkspace";
-import { getConfiguratorData } from "@/lib/db/queries";
+import { getPricingAccess } from "@/lib/auth";
+import {
+  getConfiguratorData,
+  getSavedConfigurationImportOptions,
+} from "@/lib/db/queries";
 
 export default async function ConfiguratorPage({
   searchParams,
@@ -7,13 +11,21 @@ export default async function ConfiguratorPage({
   searchParams: Promise<{ frameId?: string; step?: string }>;
 }) {
   const params = await searchParams;
-  const data = await getConfiguratorData(params.frameId);
+  const [data, pricingAccess, savedConfigurations] = await Promise.all([
+    getConfiguratorData(params.frameId),
+    getPricingAccess(),
+    getSavedConfigurationImportOptions(),
+  ]);
 
   return (
     <ConfiguratorWorkspace
       key={`${data.selectedFrame.id}-${params.step ?? "frame"}`}
       data={data}
-      initialStep={params.step === "breakers" ? "breakers" : "frame"}
+      pricingAccess={pricingAccess}
+      savedConfigurations={savedConfigurations}
+      initialStep={
+        params.step === "breakers" || params.step === "quote" ? params.step : "frame"
+      }
     />
   );
 }

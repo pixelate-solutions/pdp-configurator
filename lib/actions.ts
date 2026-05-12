@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { getPricingAccess } from "@/lib/auth";
 import { buildBom } from "@/lib/bom";
 import { getConfiguratorData } from "@/lib/db/queries";
 import { getDb } from "@/lib/db/client";
+import { sendPricingRequestEmail } from "@/lib/pricing-request-email";
 import {
   adminSettings,
   accessories,
@@ -25,6 +27,11 @@ const saveConfigurationSchema = z.object({
   customerName: z.string().min(1),
   projectName: z.string().min(1),
   notes: z.string().optional().default(""),
+  selections: z.record(z.string().uuid(), z.string().uuid().nullable()),
+});
+
+const requestPricingSchema = z.object({
+  frameId: z.string().uuid(),
   selections: z.record(z.string().uuid(), z.string().uuid().nullable()),
 });
 
@@ -106,6 +113,102 @@ export async function saveConfigurationAction(input: unknown) {
     ok: true,
     id: savedConfiguration.id,
     message: "Configuration saved.",
+  };
+}
+
+export async function requestPricingAction(input: unknown) {
+  const parsed = requestPricingSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Review the configuration before requesting pricing." };
+  }
+
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    return {
+      ok: false,
+      message: "Configure Clerk keys before requesting pricing.",
+    };
+  }
+
+  const { userId } = await auth();
+  if (!userId) {
+    return { ok: false, message: "Create an account or sign in before requesting pricing." };
+  }
+
+  const pricingAccess = await getPricingAccess();
+  if (!pricingAccess.signedIn) {
+    return { ok: false, message: "Create an account or sign in before requesting pricing." };
+  }
+
+  const db = getDb();
+  const data = await getConfiguratorData(parsed.data.frameId);
+  const bom = buildBom(data, parsed.data.selections);
+  const email = pricingAccess.email ?? "Unknown email";
+  let savedConfigurationId: string | null = null;
+
+  if (db) {
+    try {
+      const [savedConfiguration] = await db.transaction(async (tx) => {
+        const [user] = await tx
+          .insert(users)
+          .values({ clerkUserId: userId, role: "customer" })
+          .onConflictDoUpdate({
+            target: users.clerkUserId,
+            set: { updatedAt: new Date() },
+          })
+          .returning();
+
+        const [configuration] = await tx
+          .insert(configurations)
+          .values({
+            userId: user.id,
+            frameId: parsed.data.frameId,
+            name: `Pricing request - ${data.selectedFrame.catalogNumber}`,
+            customerName: email,
+            projectName: "Online pricing request",
+            notes: `Pricing requested by ${email}.`,
+            subtotal: bom.subtotal,
+            margin: bom.margin,
+            totalSellPrice: bom.totalSellPrice,
+          })
+          .returning();
+
+        await tx.insert(configurationItems).values(
+          bom.lines.map((line) => ({
+            configurationId: configuration.id,
+            slotId: line.slotId,
+            breakerOptionId: line.breakerOptionId,
+            coverPlateId: line.coverPlateId,
+            itemType: line.itemType,
+            quantity: line.quantity,
+            catalogNumber: line.catalogNumber,
+            description: line.description,
+            unitCost: line.unitCost,
+            unitSellPrice: line.unitSellPrice,
+            extendedSellPrice: line.extendedSellPrice,
+          })),
+        );
+
+        return [configuration];
+      });
+
+      savedConfigurationId = savedConfiguration.id;
+      revalidatePath("/admin/configurations");
+    } catch (error) {
+      console.warn("Unable to store pricing request; sending email only.", error);
+    }
+  }
+
+  const emailResult = await sendPricingRequestEmail({
+    data,
+    bom,
+    requesterEmail: email,
+    configurationId: savedConfigurationId,
+  });
+
+  return {
+    ok: emailResult.ok,
+    id: savedConfigurationId,
+    message: emailResult.message,
   };
 }
 

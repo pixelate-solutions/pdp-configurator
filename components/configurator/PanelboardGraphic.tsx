@@ -27,8 +27,10 @@ export function PanelboardGraphic({
 }) {
   const breakerById = new Map(data.breakerOptions.map((item) => [item.id, item]));
   const animationRef = useRef<number | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const viewBoxRef = useRef({ x: 0, y: 0, w: 320, h: 900 });
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 320, h: 900 });
+  const scrollableMode = !previewMode && !completed;
   const lowerSlotCount = data.slots.filter((slot) => slot.breakerFamily === "3VA52").length;
   const lowerRows = Math.ceil(lowerSlotCount / 2);
   const lowerSlotHeight = lowerSlotCount > 16 ? 42 : 48;
@@ -106,6 +108,31 @@ export function PanelboardGraphic({
     };
   }, [selectedSlotId, previewMode, completed, data.slots, slotGeometry]);
 
+  useEffect(() => {
+    if (!scrollableMode || !selectedSlotId) return;
+
+    const scrollContainer = scrollContainerRef.current;
+    const selectedIndex = data.slots.findIndex((slot) => slot.id === selectedSlotId);
+    const selectedSlot =
+      selectedIndex >= 0 ? data.slots[selectedIndex] ?? null : null;
+    if (!scrollContainer || !selectedSlot) return;
+
+    const geometry = slotGeometry(selectedSlot, selectedIndex);
+    const slotCenter = geometry.y + geometry.h / 2;
+    const scrollTarget =
+      (slotCenter / 900) * scrollContainer.scrollHeight -
+      scrollContainer.clientHeight / 2;
+
+    scrollContainer.scrollTo({
+      top: Math.max(0, scrollTarget),
+      behavior: "smooth",
+    });
+  }, [selectedSlotId, scrollableMode, data.slots, slotGeometry]);
+
+  const activeViewBox = scrollableMode
+    ? { x: 0, y: 0, w: 320, h: 900 }
+    : viewBox;
+
   return (
     <section className="glass-panel overflow-hidden rounded-[2rem]">
       <div className="flex items-center justify-between gap-3 border-b border-white/18 bg-primary/92 px-5 py-3.5 text-white backdrop-blur">
@@ -122,10 +149,17 @@ export function PanelboardGraphic({
         </div>
       </div>
 
-      <div className="bg-[#1f2933] p-2 sm:p-4">
+      <div
+        ref={scrollContainerRef}
+        className={`bg-[#1f2933] p-2 sm:p-4 ${
+          scrollableMode
+            ? "max-h-[58vh] overflow-y-auto overscroll-contain scroll-smooth"
+            : ""
+        }`}
+      >
         <svg
           className="mx-auto block h-auto w-full max-w-[480px]"
-          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
+          viewBox={`${activeViewBox.x} ${activeViewBox.y} ${activeViewBox.w} ${activeViewBox.h}`}
           role="img"
           aria-label="Panelboard layout"
         >
