@@ -3,14 +3,12 @@ import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { isClerkConfigured } from "@/lib/clerk-config";
 
-const optionalClerkMiddleware = clerkMiddleware();
-
-export default function middleware(request: NextRequest, event: NextFetchEvent) {
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
   if (!isClerkConfigured()) {
     return NextResponse.next();
   }
 
-  return optionalClerkMiddleware(request, event);
+  return clerkMiddleware()(request, event);
 }
 
 export const config = {

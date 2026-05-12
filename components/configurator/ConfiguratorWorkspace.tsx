@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { SignUpButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -107,22 +107,6 @@ function PricingGateActions({
             Create account to request price
           </Button>
         </SignUpButton>
-        <SignInButton
-          mode="modal"
-          forceRedirectUrl={returnUrl}
-          fallbackRedirectUrl={returnUrl}
-          signUpForceRedirectUrl={returnUrl}
-          signUpFallbackRedirectUrl={returnUrl}
-        >
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            onClick={onBeforeAuth}
-          >
-            Sign in to request pricing
-          </Button>
-        </SignInButton>
       </div>
     );
   }
@@ -142,12 +126,14 @@ export function ConfiguratorWorkspace({
   savedConfigurations = [],
   initialSelections,
   initialStep = "frame",
+  initialFrameSelected = false,
 }: {
   data: ConfiguratorData;
   pricingAccess?: PricingAccess;
   savedConfigurations?: SavedConfigurationImportOption[];
   initialSelections?: SlotSelection;
   initialStep?: ConfiguratorStep;
+  initialFrameSelected?: boolean;
 }) {
   const router = useRouter();
   const [selections, setSelections] = useState<SlotSelection>(
@@ -157,6 +143,7 @@ export function ConfiguratorWorkspace({
       createDefaultSelections(data),
   );
   const [activeStep, setActiveStep] = useState<ConfiguratorStep>(initialStep);
+  const [frameSelected, setFrameSelected] = useState(initialFrameSelected);
   const [breakerStarted, setBreakerStarted] = useState(initialStep === "quote");
   const [walkIndex, setWalkIndex] = useState(0);
   const [invalidSlotId, setInvalidSlotId] = useState<string | null>(null);
@@ -167,7 +154,7 @@ export function ConfiguratorWorkspace({
   const [completed, setCompleted] = useState(false);
 
   const bom = useMemo(() => buildBom(data, selections), [data, selections]);
-  const canRequestPricing = pricingAccess.signedIn;
+  const canRequestPricing = pricingAccess.signedIn && frameSelected;
   const quoteReturnUrl = `/configurator?frameId=${data.selectedFrame.id}&step=quote`;
   const selectedSlot = data.slots[walkIndex] ?? data.slots[0] ?? null;
   const selectedSlotId = selectedSlot?.id ?? null;
@@ -215,6 +202,7 @@ export function ConfiguratorWorkspace({
   };
 
   const openFrameConfiguration = (frameId: string) => {
+    setFrameSelected(true);
     setActiveStep("breakers");
     setBreakerStarted(false);
     setPreviewMode(true);
@@ -680,7 +668,21 @@ export function ConfiguratorWorkspace({
                     </div>
                   </div>
                   <div className="mb-5 rounded-3xl border border-white/70 bg-white/62 p-4 backdrop-blur">
-                    {canRequestPricing ? (
+                    {!frameSelected ? (
+                      <div className="space-y-3 text-center">
+                        <p className="text-xs font-semibold text-danger">
+                          Select a frame size before requesting pricing.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() => goToStep("frame")}
+                        >
+                          Select frame size
+                        </Button>
+                      </div>
+                    ) : canRequestPricing ? (
                       <RequestPricingButton
                         frameId={data.selectedFrame.id}
                         selections={selections}

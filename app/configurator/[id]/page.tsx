@@ -25,6 +25,7 @@ export default async function SavedConfigurationPage({
       pricingAccess={pricingAccess}
       savedConfigurations={savedConfigurations}
       initialSelections={saved.selections}
+      initialFrameSelected
     />
   );
 }

@@ -23,6 +23,7 @@ export default async function ConfiguratorPage({
       data={data}
       pricingAccess={pricingAccess}
       savedConfigurations={savedConfigurations}
+      initialFrameSelected={Boolean(params.frameId)}
       initialStep={
         params.step === "breakers" || params.step === "quote" ? params.step : "frame"
       }
