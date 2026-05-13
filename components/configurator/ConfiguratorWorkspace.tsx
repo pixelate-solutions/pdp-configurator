@@ -151,7 +151,6 @@ export function ConfiguratorWorkspace({
   const [saveOpen, setSaveOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState(true);
-  const [completed, setCompleted] = useState(false);
 
   const bom = useMemo(() => buildBom(data, selections), [data, selections]);
   const canRequestPricing = pricingAccess.signedIn && frameSelected;
@@ -206,7 +205,6 @@ export function ConfiguratorWorkspace({
     setActiveStep("breakers");
     setBreakerStarted(false);
     setPreviewMode(true);
-    setCompleted(false);
     setWalkIndex(0);
 
     if (frameId === data.selectedFrame.id) {
@@ -223,7 +221,6 @@ export function ConfiguratorWorkspace({
     setBreakerStarted(true);
     setInvalidSlotId(null);
     setValidationMessage("");
-    setCompleted(false);
   };
 
   const walkTo = (index: number) => {
@@ -231,7 +228,6 @@ export function ConfiguratorWorkspace({
     setWalkIndex(nextIndex);
     setInvalidSlotId(null);
     setValidationMessage("");
-    setCompleted(false);
   };
 
   const chooseBreaker = (breaker: BreakerOption | null, autoAdvance = true) => {
@@ -258,7 +254,6 @@ export function ConfiguratorWorkspace({
     }));
     setInvalidSlotId(null);
     setValidationMessage("");
-    setCompleted(false);
 
     if (breaker && autoAdvance) {
       window.setTimeout(() => {
@@ -275,14 +270,12 @@ export function ConfiguratorWorkspace({
     setSelections(createDefaultSelections(data));
     setValidationMessage("");
     setInvalidSlotId(null);
-    setCompleted(false);
     setClearOpen(false);
   };
 
-  const finishWithCovers = () => {
+  const finishConfiguration = () => {
     setValidationMessage("");
     setInvalidSlotId(null);
-    setCompleted(true);
     setPreviewMode(true);
     goToStep("quote");
   };
@@ -395,7 +388,6 @@ export function ConfiguratorWorkspace({
                   onClick={() => {
                     setBreakerStarted(true);
                     setPreviewMode(false);
-                    setCompleted(false);
                     walkTo(0);
                   }}
                 >
@@ -487,26 +479,9 @@ export function ConfiguratorWorkspace({
                     selectedSlotId={selectedSlotId}
                     invalidSlotId={invalidSlotId}
                     previewMode={previewMode}
-                    completed={completed}
                     onSelectSlot={chooseSlot}
                   />
                 </div>
-                {completed ? (
-                  <div className="glass-panel rounded-[2rem] bg-[rgba(20,64,118,0.9)] p-6 text-center text-white">
-                    <h2 className="text-xl font-bold">Configuration Complete</h2>
-                    <p className="mt-2 text-sm text-white/75">
-                      {filledCount} of {data.slots.length} slots populated ·{" "}
-                      {data.slots.length - filledCount} cover plates
-                    </p>
-                    <Button
-                      type="button"
-                      className="mt-5 bg-white text-primary hover:bg-white/90"
-                      onClick={() => goToStep("quote")}
-                    >
-                      Review & Quote →
-                    </Button>
-                  </div>
-                ) : null}
                 </div>
               </div>
 
@@ -596,33 +571,16 @@ export function ConfiguratorWorkspace({
                     className="min-h-9 text-xs"
                     onClick={() => {
                       if (walkIndex < data.slots.length - 1) walkTo(walkIndex + 1);
-                      else if (selectedBreaker) {
-                        setCompleted(true);
-                        setPreviewMode(true);
-                      } else {
-                        goToStep("quote");
-                      }
+                      else finishConfiguration();
                     }}
                   >
                     {walkIndex === data.slots.length - 1
-                      ? selectedBreaker
-                        ? "Finish →"
-                        : "Skip & Finish →"
+                      ? "Finish →"
                       : selectedBreaker
                         ? "Next →"
                         : "Skip →"}
                   </Button>
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="mt-2 min-h-9 w-full text-xs"
-                  onClick={finishWithCovers}
-                >
-                  Finish with cover plates →
-                </Button>
-
                 <div className="mt-4 mb-2 h-2 overflow-hidden rounded-full bg-primary/10">
                   <div
                     className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
