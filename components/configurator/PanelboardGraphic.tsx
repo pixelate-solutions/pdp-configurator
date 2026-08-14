@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Ref } from "react";
 import type {
   BreakerOption,
   ConfiguratorData,
@@ -15,6 +15,7 @@ export function PanelboardGraphic({
   invalidSlotId,
   previewMode = false,
   completed = false,
+  svgRef,
   onSelectSlot,
 }: {
   data: ConfiguratorData;
@@ -23,6 +24,7 @@ export function PanelboardGraphic({
   invalidSlotId?: string | null;
   previewMode?: boolean;
   completed?: boolean;
+  svgRef?: Ref<SVGSVGElement>;
   onSelectSlot: (slot: PanelSlot) => void;
 }) {
   const breakerById = new Map(data.breakerOptions.map((item) => [item.id, item]));
@@ -158,6 +160,7 @@ export function PanelboardGraphic({
         }`}
       >
         <svg
+          ref={svgRef}
           className="mx-auto block h-auto w-full max-w-[480px]"
           viewBox={`${activeViewBox.x} ${activeViewBox.y} ${activeViewBox.w} ${activeViewBox.h}`}
           role="img"

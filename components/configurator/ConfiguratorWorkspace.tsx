@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { SignUpButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   Check,
+  Download,
   LockKeyhole,
   Maximize2,
   Minimize2,
@@ -151,6 +152,10 @@ export function ConfiguratorWorkspace({
   const [saveOpen, setSaveOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState(true);
+  const [imageDownloadState, setImageDownloadState] = useState<
+    "idle" | "downloading" | "error"
+  >("idle");
+  const finishedPanelSvgRef = useRef<SVGSVGElement | null>(null);
 
   const bom = useMemo(() => buildBom(data, selections), [data, selections]);
   const canRequestPricing = pricingAccess.signedIn && frameSelected;
@@ -278,6 +283,69 @@ export function ConfiguratorWorkspace({
     setInvalidSlotId(null);
     setPreviewMode(true);
     goToStep("quote");
+  };
+
+  const downloadPanelImage = async () => {
+    const sourceSvg = finishedPanelSvgRef.current;
+    if (!sourceSvg || imageDownloadState === "downloading") return;
+
+    setImageDownloadState("downloading");
+
+    try {
+      const exportWidth = 960;
+      const exportHeight = 2700;
+      const svg = sourceSvg.cloneNode(true) as SVGSVGElement;
+      svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      svg.setAttribute("width", String(exportWidth));
+      svg.setAttribute("height", String(exportHeight));
+      svg.setAttribute("viewBox", "0 0 320 900");
+
+      const serializedSvg = new XMLSerializer().serializeToString(svg);
+      const svgUrl = URL.createObjectURL(
+        new Blob([serializedSvg], { type: "image/svg+xml;charset=utf-8" }),
+      );
+
+      try {
+        const image = new Image();
+        image.decoding = "async";
+        image.src = svgUrl;
+        await image.decode();
+
+        const canvas = document.createElement("canvas");
+        canvas.width = exportWidth;
+        canvas.height = exportHeight;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas is unavailable.");
+
+        context.drawImage(image, 0, 0, exportWidth, exportHeight);
+        const png = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("PNG generation failed."));
+          }, "image/png");
+        });
+
+        const pngUrl = URL.createObjectURL(png);
+        const link = document.createElement("a");
+        const safeCatalogNumber = data.selectedFrame.catalogNumber
+          .trim()
+          .replace(/[^a-z0-9_-]+/gi, "-")
+          .replace(/^-+|-+$/g, "");
+        link.href = pngUrl;
+        link.download = `${safeCatalogNumber || "panelboard"}-layout.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(pngUrl), 1_000);
+      } finally {
+        URL.revokeObjectURL(svgUrl);
+      }
+
+      setImageDownloadState("idle");
+    } catch (error) {
+      console.error("Unable to download the panelboard image", error);
+      setImageDownloadState("error");
+    }
   };
 
   const stepIndex = stepOrder.indexOf(activeStep);
@@ -664,15 +732,34 @@ export function ConfiguratorWorkspace({
                     {data.selectedFrame.systemVoltage} · 65 KAIC · {data.selectedFrame.mainBusAmps}A Main
                   </div>
                 </div>
-                <div className="mt-5 flex flex-wrap gap-2 text-sm">
-                  <button
+                <div className="mt-5 grid gap-2 text-sm sm:grid-cols-2">
+                  <Button
                     type="button"
-                    className="pressable inline-flex h-10 w-full cursor-pointer items-center justify-center gap-1 rounded-full bg-primary px-3 text-xs font-semibold leading-none text-primary-foreground shadow-sm transition hover:cursor-pointer hover:bg-[var(--blue-light)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
                     onClick={() => setSaveOpen(true)}
                   >
-                    <Save className="size-3" /> Save
-                  </button>
+                    <Save className="size-4" /> Save configuration
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full"
+                    disabled={imageDownloadState === "downloading"}
+                    onClick={downloadPanelImage}
+                  >
+                    <Download className="size-4" />
+                    {imageDownloadState === "downloading"
+                      ? "Preparing image…"
+                      : "Download panel image"}
+                  </Button>
                 </div>
+                {imageDownloadState === "error" ? (
+                  <p role="alert" className="mt-2 text-center text-xs font-semibold text-danger">
+                    The panel image could not be created. Please try again.
+                  </p>
+                ) : null}
               </div>
               <div className="grid gap-5">
                 <LiveBom bom={bom} />
@@ -682,6 +769,20 @@ export function ConfiguratorWorkspace({
           </section>
         ) : null}
       </div>
+
+      {activeStep === "quote" ? (
+        <div className="hidden" aria-hidden="true">
+          <PanelboardGraphic
+            data={data}
+            selections={selections}
+            selectedSlotId={null}
+            previewMode
+            completed
+            svgRef={finishedPanelSvgRef}
+            onSelectSlot={() => undefined}
+          />
+        </div>
+      ) : null}
 
       <SaveConfigurationDialog
         open={saveOpen}

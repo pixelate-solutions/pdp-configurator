@@ -78,6 +78,7 @@ The configurator supports:
 
 - Printable quote/PDF through the browser print dialog
 - CSV BOM export for spreadsheet workflows
+- High-resolution PNG export of the finished panelboard layout
 
 ## Development Commands
 
