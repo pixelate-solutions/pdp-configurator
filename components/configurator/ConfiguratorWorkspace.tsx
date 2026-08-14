@@ -181,12 +181,6 @@ export function ConfiguratorWorkspace({
   }, 0);
   const progressPct =
     data.slots.length > 0 ? Math.round((filledCount / data.slots.length) * 100) : 0;
-  const projectedAmpTotal = (breaker: BreakerOption | null) => {
-    const currentAmps = selectedBreaker?.amps ?? 0;
-    return selectedAmpTotal - currentAmps + (breaker?.amps ?? 0);
-  };
-  const exceedsFrame = (breaker: BreakerOption | null) =>
-    projectedAmpTotal(breaker) > data.selectedFrame.mainBusAmps;
 
   const persistReviewState = () => {
     window.sessionStorage.setItem(
@@ -242,14 +236,6 @@ export function ConfiguratorWorkspace({
     if (!validation.valid) {
       setInvalidSlotId(selectedSlot.id);
       setValidationMessage(validation.message);
-      return;
-    }
-
-    if (breaker && exceedsFrame(breaker)) {
-      setInvalidSlotId(selectedSlot.id);
-      setValidationMessage(
-        `This selection would total ${projectedAmpTotal(breaker)}A, above the ${data.selectedFrame.mainBusAmps}A frame limit.`,
-      );
       return;
     }
 
@@ -486,41 +472,23 @@ export function ConfiguratorWorkspace({
                     </div>
                     <div className="min-w-0 sm:text-right">
                       <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                        Frame Load
+                        Configured Amperage
                       </div>
                       <div className="mt-0.5 text-sm font-bold">
-                        {selectedAmpTotal}A / {data.selectedFrame.mainBusAmps}A
+                        {selectedAmpTotal}A total
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <div className="mb-1 flex justify-between text-[10px] font-semibold text-muted-foreground">
-                        <span>{filledCount} of {data.slots.length} assigned</span>
-                        <span>{progressPct}%</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-primary/10">
-                        <div
-                          className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
-                          style={{ width: `${progressPct}%` }}
-                        />
-                      </div>
+                  <div className="mt-3">
+                    <div className="mb-1 flex justify-between text-[10px] font-semibold text-muted-foreground">
+                      <span>{filledCount} of {data.slots.length} assigned</span>
+                      <span>{progressPct}%</span>
                     </div>
-                    <div>
-                      <div className="mb-1 flex justify-between text-[10px] font-semibold text-muted-foreground">
-                        <span>Load</span>
-                        <span>
-                          {Math.min(100, Math.round((selectedAmpTotal / data.selectedFrame.mainBusAmps) * 100))}%
-                        </span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-primary/10">
-                        <div
-                          className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
-                          style={{
-                            width: `${Math.min(100, Math.round((selectedAmpTotal / data.selectedFrame.mainBusAmps) * 100))}%`,
-                          }}
-                        />
-                      </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-primary/10">
+                      <div
+                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
+                        style={{ width: `${progressPct}%` }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -574,33 +542,23 @@ export function ConfiguratorWorkspace({
                   </div>
                 ) : null}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3">
-                  {allowedBreakers.map((breaker) => {
-                    const disabled =
-                      selectedBreakerId !== breaker.id && exceedsFrame(breaker);
-                    return (
-                      <button
-                        key={breaker.id}
-                        type="button"
-                        disabled={disabled}
-                        className={`pressable cursor-pointer rounded-2xl border-2 px-2 py-3 text-center text-[17px] font-bold transition hover:cursor-pointer hover:border-primary hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 ${
-                          selectedBreakerId === breaker.id
-                            ? "border-primary bg-[rgba(43,129,191,0.12)] text-primary shadow-[0_10px_24px_rgba(26,83,141,0.12)]"
-                            : "border-gray-200 text-foreground"
-                        }`}
-                        title={
-                          disabled
-                            ? `Would exceed ${data.selectedFrame.mainBusAmps}A frame limit`
-                            : undefined
-                        }
-                        onClick={() => chooseBreaker(breaker)}
-                      >
-                        {breaker.amps}A
-                        <span className="mt-1 block text-[9px] font-normal text-muted-foreground">
-                          3-Pole
-                        </span>
-                      </button>
-                    );
-                  })}
+                  {allowedBreakers.map((breaker) => (
+                    <button
+                      key={breaker.id}
+                      type="button"
+                      className={`pressable cursor-pointer rounded-2xl border-2 px-2 py-3 text-center text-[17px] font-bold transition hover:cursor-pointer hover:border-primary hover:bg-white ${
+                        selectedBreakerId === breaker.id
+                          ? "border-primary bg-[rgba(43,129,191,0.12)] text-primary shadow-[0_10px_24px_rgba(26,83,141,0.12)]"
+                          : "border-gray-200 text-foreground"
+                      }`}
+                      onClick={() => chooseBreaker(breaker)}
+                    >
+                      {breaker.amps}A
+                      <span className="mt-1 block text-[9px] font-normal text-muted-foreground">
+                        3-Pole
+                      </span>
+                    </button>
+                  ))}
                 </div>
 
                 {selectedBreaker ? (
