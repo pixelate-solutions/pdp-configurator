@@ -12,9 +12,15 @@ import {
   panelboardFrames,
   panelboardSlots,
 } from "@/lib/db/schema";
-import type { ConfiguratorData, SlotSelection } from "@/lib/configurator-types";
+import type {
+  ConfiguratorData,
+  PanelSlot,
+  SlotSelection,
+} from "@/lib/configurator-types";
 import {
+  OBSOLETE_600_SLOT_KEYS,
   SEEDED_FRAME_ID,
+  SEEDED_FRAME_600_ID,
   allSeededFrameAccessories,
   allSeededSlots,
   seededAccessories,
@@ -101,6 +107,16 @@ function applyMargin(data: ConfiguratorData, margin: number): ConfiguratorData {
   };
 }
 
+const obsolete600SlotKeys = new Set<string>(OBSOLETE_600_SLOT_KEYS);
+
+function withoutExtra600Row(slots: PanelSlot[]) {
+  return slots.filter(
+    (slot) =>
+      slot.frameId !== SEEDED_FRAME_600_ID ||
+      !obsolete600SlotKeys.has(slot.slotKey),
+  );
+}
+
 export async function getConfiguratorData(frameId?: string): Promise<ConfiguratorData> {
   const db = getDb();
   const margin = await getPricingMargin();
@@ -154,7 +170,7 @@ export async function getConfiguratorData(frameId?: string): Promise<Configurato
       frames,
       selectedFrame,
       mainBreaker: mainBreaker ?? seededMainBreaker,
-      slots,
+      slots: withoutExtra600Row(slots),
       breakerOptions: breakers,
       coverPlates: plates,
       accessories: allAccessories,
@@ -178,7 +194,9 @@ export function getFallbackConfiguratorData(frameId?: string): ConfiguratorData 
     mainBreaker:
       seededMainBreakers.find((breaker) => breaker.frameId === selectedFrame.id) ??
       seededMainBreaker,
-    slots: allSeededSlots.filter((slot) => slot.frameId === selectedFrame.id),
+    slots: withoutExtra600Row(
+      allSeededSlots.filter((slot) => slot.frameId === selectedFrame.id),
+    ),
     breakerOptions: seededBreakerOptions,
     coverPlates: seededCoverPlates,
     accessories: seededAccessories,
@@ -255,7 +273,7 @@ function getFallbackAdminCatalog(defaultMargin: number) {
       ...frame,
       baseSellPrice: sellPriceFromCost(frame.baseCost, defaultMargin),
     })),
-    slots: allSeededSlots,
+    slots: withoutExtra600Row(allSeededSlots),
     breakerOptions: seededBreakerOptions.map((breaker) => ({
       ...breaker,
       sellPrice: sellPriceFromCost(breaker.cost, defaultMargin),
@@ -294,7 +312,7 @@ export async function getAdminCatalog() {
         ...frame,
         baseSellPrice: sellPriceFromCost(frame.baseCost, defaultMargin),
       })),
-      slots,
+      slots: withoutExtra600Row(slots),
       breakerOptions: breakers.map((breaker) => ({
         ...breaker,
         sellPrice: sellPriceFromCost(breaker.cost, defaultMargin),

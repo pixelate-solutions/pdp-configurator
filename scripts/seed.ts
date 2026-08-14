@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   accessories,
   adminSettings,
@@ -13,6 +13,8 @@ import {
 } from "../lib/db/schema";
 import { DEFAULT_ADMIN_MARGIN } from "../lib/pricing";
 import {
+  OBSOLETE_600_SLOT_KEYS,
+  SEEDED_FRAME_600_ID,
   allSeededFrameAccessories,
   allSeededSlots,
   seededAccessories,
@@ -67,6 +69,15 @@ async function main() {
         set: { ...slot, updatedAt: new Date() },
       });
   }
+
+  await db
+    .delete(panelboardSlots)
+    .where(
+      and(
+        eq(panelboardSlots.frameId, SEEDED_FRAME_600_ID),
+        inArray(panelboardSlots.slotKey, [...OBSOLETE_600_SLOT_KEYS]),
+      ),
+    );
 
   for (const breaker of seededBreakerOptions) {
     await db

@@ -12,6 +12,7 @@ import { DEFAULT_ADMIN_MARGIN, sellPriceFromCost } from "@/lib/pricing";
 export const SEEDED_FRAME_ID = "00000000-0000-4000-8000-000000000001";
 export const SEEDED_FRAME_400_ID = "00000000-0000-4000-8000-000000000040";
 export const SEEDED_FRAME_600_ID = "00000000-0000-4000-8000-000000000060";
+export const OBSOLETE_600_SLOT_KEYS = ["L17", "L18"] as const;
 
 const seededId = (number: number) =>
   `00000000-0000-4000-8000-${String(number).padStart(12, "0")}`;
@@ -131,12 +132,6 @@ const largeSlotRows = [
   ["L16", "B16", "56/58/60", 325],
 ] as const;
 
-const large600SlotRows = [
-  ...largeSlotRows,
-  ["L17", "B17", "61/63/65", 310],
-  ["L18", "B18", "62/64/66", 311],
-] as const;
-
 function makeSlots(
   frameId: string,
   baseId: number,
@@ -197,7 +192,7 @@ export const seeded400Slots = makeSlots(SEEDED_FRAME_400_ID, 4000, {
 
 export const seeded600Slots = makeSlots(SEEDED_FRAME_600_ID, 6000, {
   small: [278, 279, 281, 282],
-  large: large600SlotRows,
+  large: largeSlotRows,
 });
 
 export const seededSlots: PanelSlot[] = makeSlots(SEEDED_FRAME_ID, 0, {
