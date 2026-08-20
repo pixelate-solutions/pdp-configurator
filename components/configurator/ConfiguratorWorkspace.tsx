@@ -225,7 +225,7 @@ export function ConfiguratorWorkspace({
 
   return (
     <>
-      <div className="no-print mx-auto w-full max-w-7xl px-4 py-8 sm:px-8">
+      <div className="no-print mx-auto w-full max-w-7xl px-4 py-8 sm:px-8 lg:flex lg:min-h-screen lg:flex-col">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-3xl font-bold">Siemens Panelboards</h1>
           <nav className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
@@ -265,8 +265,8 @@ export function ConfiguratorWorkspace({
         ) : null}
 
         {activeStep === "breakers" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-            <div className="relative order-2 lg:order-1">
+          <section className="mt-6 grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+            <div className="relative order-2 lg:order-1 lg:h-full lg:min-h-0">
               <div className="pointer-events-none absolute right-4 top-4 z-10">
                 <Button
                   type="button"

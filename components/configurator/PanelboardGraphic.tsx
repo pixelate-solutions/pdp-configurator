@@ -136,7 +136,11 @@ export function PanelboardGraphic({
     : viewBox;
 
   return (
-    <section className="card overflow-hidden">
+    <section
+      className={`card overflow-hidden ${
+        scrollableMode ? "lg:flex lg:h-full lg:min-h-0 lg:flex-col" : ""
+      }`}
+    >
       <div className="flex items-center justify-between gap-3 border-b border-border bg-primary px-5 py-3 text-white">
         <div className="min-w-0 truncate text-[13px] font-bold">
           {data.selectedFrame.panelType} · {data.selectedFrame.heightInches} in
@@ -150,7 +154,7 @@ export function PanelboardGraphic({
         ref={scrollContainerRef}
         className={`bg-[#1f2933] p-2 sm:p-4 ${
           scrollableMode
-            ? "max-h-[58vh] overflow-y-auto overscroll-contain scroll-smooth"
+            ? "max-h-[70dvh] overflow-y-auto overscroll-contain scroll-smooth lg:min-h-0 lg:max-h-none lg:flex-1"
             : ""
         }`}
       >
