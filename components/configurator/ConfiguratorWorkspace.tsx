@@ -1,31 +1,28 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { SignUpButton } from "@clerk/nextjs";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Check,
-  Download,
-  LockKeyhole,
-  Maximize2,
-  Minimize2,
-  Save,
-} from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import type {
   BreakerOption,
   ConfiguratorData,
   PanelSlot,
   SlotSelection,
 } from "@/lib/configurator-types";
-import type { SavedConfigurationImportOption } from "@/lib/db/queries";
-import type { PricingAccess } from "@/lib/pricing-access";
 import {
   buildBom,
   createDefaultSelections,
   getAllowedBreakers,
   validateSelection,
 } from "@/lib/bom";
-import { maskedPrice } from "@/lib/pricing-access";
+import {
+  PANELBOARD_IMPORT_STORAGE_KEY,
+  buildPanelboardExport,
+  findImportFrame,
+  mapImportSelections,
+  parsePanelboardExport,
+} from "@/lib/panelboard-export";
+import { readJsonFile } from "@/lib/export";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,195 +33,132 @@ import {
 } from "@/components/ui/dialog";
 import { FrameSelector } from "@/components/configurator/FrameSelector";
 import { PanelboardGraphic } from "@/components/configurator/PanelboardGraphic";
-import { LiveBom } from "@/components/configurator/LiveBom";
-import { ConfigurationSummary } from "@/components/configurator/ConfigurationSummary";
-import { SaveConfigurationDialog } from "@/components/configurator/SaveConfigurationDialog";
-import { RequestPricingButton } from "@/components/configurator/RequestPricingButton";
+import {
+  ActionBar,
+  BomTable,
+  ModelNumberCard,
+  PrintSheet,
+  SpecDetails,
+} from "@/components/em/summary";
 
-type ConfiguratorStep = "frame" | "breakers" | "quote";
+type ConfiguratorStep = "frame" | "breakers" | "summary";
 
-const stepOrder: ConfiguratorStep[] = ["frame", "breakers", "quote"];
-const pendingReviewStorageKey = "pdp-configurator-pending-review";
-const defaultPricingAccess: PricingAccess = {
-  clerkEnabled: false,
-  signedIn: false,
-  emailVerified: false,
-  email: null,
+const stepOrder: ConfiguratorStep[] = ["frame", "breakers", "summary"];
+const stepLabels: Record<ConfiguratorStep, string> = {
+  frame: "Frame",
+  breakers: "Breakers",
+  summary: "Summary",
 };
-
-function readPendingReviewSelections(frameId: string, step: ConfiguratorStep) {
-  if (step !== "quote" || typeof window === "undefined") return null;
-
-  const stored = window.sessionStorage.getItem(pendingReviewStorageKey);
-  if (!stored) return null;
-
-  try {
-    const parsed = JSON.parse(stored) as {
-      frameId?: string;
-      selections?: SlotSelection;
-    };
-    if (parsed.frameId === frameId && parsed.selections) return parsed.selections;
-  } catch {
-    window.sessionStorage.removeItem(pendingReviewStorageKey);
-  }
-
-  return null;
-}
-
-function PricingGateActions({
-  pricingAccess,
-  returnUrl,
-  onBeforeAuth,
-}: {
-  pricingAccess: PricingAccess;
-  returnUrl: string;
-  onBeforeAuth: () => void;
-}) {
-  if (!pricingAccess.clerkEnabled) {
-    return (
-      <p className="text-center text-xs font-semibold text-danger">
-        Configure Clerk to enable account creation and pricing requests.
-      </p>
-    );
-  }
-
-  if (!pricingAccess.signedIn) {
-    return (
-      <div className="grid gap-2 rounded-[1.75rem] border border-primary/18 bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(232,244,255,0.84))] p-3 shadow-[0_18px_42px_rgba(26,83,141,0.16)]">
-        <SignUpButton
-          mode="modal"
-          forceRedirectUrl={returnUrl}
-          fallbackRedirectUrl={returnUrl}
-          signInForceRedirectUrl={returnUrl}
-          signInFallbackRedirectUrl={returnUrl}
-        >
-          <Button
-            type="button"
-            size="lg"
-            className="price-request-cta group min-h-14 w-full rounded-[1.4rem] bg-[linear-gradient(135deg,var(--primary),var(--blue-light))] text-base shadow-[0_16px_34px_rgba(26,83,141,0.34)] hover:shadow-[0_22px_48px_rgba(26,83,141,0.4)]"
-            onClick={onBeforeAuth}
-          >
-            <LockKeyhole className="size-5 transition group-hover:-translate-y-0.5" />
-            Create account to request price
-          </Button>
-        </SignUpButton>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2 text-center">
-      <p className="text-xs font-semibold text-muted-foreground">
-        Your account is ready. Send this configuration to request pricing.
-      </p>
-    </div>
-  );
-}
 
 export function ConfiguratorWorkspace({
   data,
-  pricingAccess = defaultPricingAccess,
-  savedConfigurations = [],
-  initialSelections,
   initialStep = "frame",
   initialFrameSelected = false,
 }: {
   data: ConfiguratorData;
-  pricingAccess?: PricingAccess;
-  savedConfigurations?: SavedConfigurationImportOption[];
-  initialSelections?: SlotSelection;
   initialStep?: ConfiguratorStep;
   initialFrameSelected?: boolean;
 }) {
   const router = useRouter();
-  const [selections, setSelections] = useState<SlotSelection>(
-    () =>
-      initialSelections ??
-      readPendingReviewSelections(data.selectedFrame.id, initialStep) ??
-      createDefaultSelections(data),
+  const [selections, setSelections] = useState<SlotSelection>(() =>
+    createDefaultSelections(data),
   );
   const [activeStep, setActiveStep] = useState<ConfiguratorStep>(initialStep);
   const [frameSelected, setFrameSelected] = useState(initialFrameSelected);
-  const [breakerStarted, setBreakerStarted] = useState(initialStep === "quote");
   const [walkIndex, setWalkIndex] = useState(0);
   const [invalidSlotId, setInvalidSlotId] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState("");
-  const [saveOpen, setSaveOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
-  const [previewMode, setPreviewMode] = useState(true);
-  const [imageDownloadState, setImageDownloadState] = useState<
-    "idle" | "downloading" | "error"
-  >("idle");
+  const [previewMode, setPreviewMode] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const finishedPanelSvgRef = useRef<SVGSVGElement | null>(null);
 
+  // Apply a cross-frame import handed off through sessionStorage. Runs after
+  // hydration (not in a state initializer) so server and client render the
+  // same HTML; deferred to a timeout so the effect itself stays side-effect only.
+  useEffect(() => {
+    const stored = window.sessionStorage.getItem(PANELBOARD_IMPORT_STORAGE_KEY);
+    if (!stored) return;
+    window.sessionStorage.removeItem(PANELBOARD_IMPORT_STORAGE_KEY);
+
+    let file: ReturnType<typeof parsePanelboardExport> = null;
+    try {
+      file = parsePanelboardExport(JSON.parse(stored));
+    } catch {
+      return;
+    }
+    if (
+      !file ||
+      (file.frame.id !== data.selectedFrame.id &&
+        file.frame.catalogNumber !== data.selectedFrame.catalogNumber)
+    ) {
+      return;
+    }
+
+    const applied = file;
+    const timer = window.setTimeout(() => {
+      setSelections(mapImportSelections(data, applied));
+      setFrameSelected(true);
+      setActiveStep("summary");
+      setPreviewMode(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [data]);
+
   const bom = useMemo(() => buildBom(data, selections), [data, selections]);
-  const canRequestPricing = pricingAccess.signedIn && frameSelected;
-  const quoteReturnUrl = `/configurator?frameId=${data.selectedFrame.id}&step=quote`;
   const selectedSlot = data.slots[walkIndex] ?? data.slots[0] ?? null;
   const selectedSlotId = selectedSlot?.id ?? null;
-  const selectedBreakerId = selectedSlot
-    ? selections[selectedSlot.id] ?? null
-    : null;
+  const selectedBreakerId = selectedSlot ? selections[selectedSlot.id] ?? null : null;
   const selectedBreaker = selectedBreakerId
     ? data.breakerOptions.find((option) => option.id === selectedBreakerId)
     : null;
-  const allowedBreakers = selectedSlot
-    ? getAllowedBreakers(data, selectedSlot.id)
-    : [];
-  const filledCount = data.slots.filter((slot) => selections[slot.id]).length;
-  const selectedAmpTotal = data.slots.reduce((sum, slot) => {
-    const breakerId = selections[slot.id];
-    const breaker = breakerId
-      ? data.breakerOptions.find((option) => option.id === breakerId)
-      : null;
-    return sum + (breaker?.amps ?? 0);
-  }, 0);
-  const progressPct =
-    data.slots.length > 0 ? Math.round((filledCount / data.slots.length) * 100) : 0;
+  const allowedBreakers = selectedSlot ? getAllowedBreakers(data, selectedSlot.id) : [];
 
-  const persistReviewState = () => {
-    window.sessionStorage.setItem(
-      pendingReviewStorageKey,
-      JSON.stringify({
-        frameId: data.selectedFrame.id,
-        selections,
-      }),
-    );
-  };
+  const specs: [string, string][] = [
+    ["Panel type", data.selectedFrame.panelType],
+    ["Catalog", data.selectedFrame.catalogNumber],
+    ["Height", `${data.selectedFrame.heightInches} in`],
+    ["Enclosure", data.selectedFrame.enclosure],
+    ["Voltage", data.selectedFrame.systemVoltage],
+    ["IR rating", data.selectedFrame.irRating],
+    [
+      "Main bus",
+      `${data.selectedFrame.mainBusAmps}A ${data.selectedFrame.busMaterial}`,
+    ],
+    ["Main breaker", data.mainBreaker.catalogNumber],
+    ["Main lugs", data.mainBreaker.lugDescription],
+    ["Feed", data.selectedFrame.feed],
+    ["Mounting", data.selectedFrame.mounting],
+    ["Conduit area", data.selectedFrame.conduitArea],
+    ["SE label", data.selectedFrame.seLabel ? "Yes" : "No"],
+    ["Series rated", data.selectedFrame.seriesRated ? "Yes" : "No"],
+  ];
 
   const goToStep = (step: ConfiguratorStep) => {
     setActiveStep(step);
-    if (step === "breakers" && !breakerStarted) {
-      setBreakerStarted(false);
-    }
+    if (step === "summary") setPreviewMode(true);
   };
 
   const openFrameConfiguration = (frameId: string) => {
     setFrameSelected(true);
     setActiveStep("breakers");
-    setBreakerStarted(false);
-    setPreviewMode(true);
+    setPreviewMode(false);
     setWalkIndex(0);
 
-    if (frameId === data.selectedFrame.id) {
-      setActiveStep("breakers");
-      return;
+    if (frameId !== data.selectedFrame.id) {
+      router.push(`/panelboards?frameId=${frameId}&step=breakers`);
     }
-
-    router.push(`/configurator?frameId=${frameId}&step=breakers`);
   };
 
   const chooseSlot = (slot: PanelSlot) => {
     const index = data.slots.findIndex((item) => item.id === slot.id);
     if (index >= 0) setWalkIndex(index);
-    setBreakerStarted(true);
     setInvalidSlotId(null);
     setValidationMessage("");
   };
 
   const walkTo = (index: number) => {
-    const nextIndex = Math.max(0, Math.min(index, data.slots.length - 1));
-    setWalkIndex(nextIndex);
+    setWalkIndex(Math.max(0, Math.min(index, data.slots.length - 1)));
     setInvalidSlotId(null);
     setValidationMessage("");
   };
@@ -253,10 +187,6 @@ export function ConfiguratorWorkspace({
     }
   };
 
-  const clearAll = () => {
-    setClearOpen(true);
-  };
-
   const confirmClearAll = () => {
     setSelections(createDefaultSelections(data));
     setValidationMessage("");
@@ -264,519 +194,263 @@ export function ConfiguratorWorkspace({
     setClearOpen(false);
   };
 
-  const finishConfiguration = () => {
-    setValidationMessage("");
-    setInvalidSlotId(null);
-    setPreviewMode(true);
-    goToStep("quote");
+  const handleImportPayload = (payload: unknown): string | null => {
+    const file = parsePanelboardExport(payload);
+    if (!file) return "This file is not a panelboard configuration.";
+    const frame = findImportFrame(data, file);
+    if (!frame) return "The frame in this file is no longer available.";
+
+    if (frame.id === data.selectedFrame.id) {
+      setSelections(mapImportSelections(data, file));
+      setFrameSelected(true);
+      goToStep("summary");
+      return null;
+    }
+
+    window.sessionStorage.setItem(PANELBOARD_IMPORT_STORAGE_KEY, JSON.stringify(file));
+    router.push(`/panelboards?frameId=${frame.id}&step=summary`);
+    return null;
   };
 
-  const downloadPanelImage = async () => {
-    const sourceSvg = finishedPanelSvgRef.current;
-    if (!sourceSvg || imageDownloadState === "downloading") return;
-
-    setImageDownloadState("downloading");
-
+  const handleImportFile = async (file: File) => {
     try {
-      const exportWidth = 960;
-      const exportHeight = 2700;
-      const svg = sourceSvg.cloneNode(true) as SVGSVGElement;
-      svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-      svg.setAttribute("width", String(exportWidth));
-      svg.setAttribute("height", String(exportHeight));
-      svg.setAttribute("viewBox", "0 0 320 900");
-
-      const serializedSvg = new XMLSerializer().serializeToString(svg);
-      const svgUrl = URL.createObjectURL(
-        new Blob([serializedSvg], { type: "image/svg+xml;charset=utf-8" }),
-      );
-
-      try {
-        const image = new Image();
-        image.decoding = "async";
-        image.src = svgUrl;
-        await image.decode();
-
-        const canvas = document.createElement("canvas");
-        canvas.width = exportWidth;
-        canvas.height = exportHeight;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("Canvas is unavailable.");
-
-        context.drawImage(image, 0, 0, exportWidth, exportHeight);
-        const png = await new Promise<Blob>((resolve, reject) => {
-          canvas.toBlob((blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error("PNG generation failed."));
-          }, "image/png");
-        });
-
-        const pngUrl = URL.createObjectURL(png);
-        const link = document.createElement("a");
-        const safeCatalogNumber = data.selectedFrame.catalogNumber
-          .trim()
-          .replace(/[^a-z0-9_-]+/gi, "-")
-          .replace(/^-+|-+$/g, "");
-        link.href = pngUrl;
-        link.download = `${safeCatalogNumber || "panelboard"}-layout.png`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.setTimeout(() => URL.revokeObjectURL(pngUrl), 1_000);
-      } finally {
-        URL.revokeObjectURL(svgUrl);
-      }
-
-      setImageDownloadState("idle");
+      const payload = await readJsonFile(file);
+      setImportError(handleImportPayload(payload));
     } catch (error) {
-      console.error("Unable to download the panelboard image", error);
-      setImageDownloadState("error");
+      setImportError(error instanceof Error ? error.message : "The file could not be imported.");
     }
   };
 
   const stepIndex = stepOrder.indexOf(activeStep);
-  const stepTab = (
-    step: ConfiguratorStep,
-    label: string,
-    mobileLabel: string,
-    index: number,
-  ) => {
-    const currentIndex = stepOrder.indexOf(step);
-    const done = currentIndex < stepIndex;
-    const active = activeStep === step;
-
-    return (
-      <button
-        key={step}
-        type="button"
-        onClick={() => goToStep(step)}
-        className={`pressable flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full px-1.5 py-2 text-[11px] transition hover:cursor-pointer sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[13px] ${
-          active
-            ? "bg-white/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
-            : done
-              ? "text-white/70 hover:text-white"
-              : "text-white/45 hover:text-white/70"
-        }`}
-      >
-        <span
-          className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-semibold sm:size-[22px] sm:text-[11px] ${
-            active
-              ? "border-white bg-white text-primary"
-              : done
-                ? "border-[var(--green)] bg-[var(--green)] text-white"
-                : "border-current"
-          }`}
-        >
-          {done ? <Check className="size-3" /> : index}
-        </span>
-        <span className="min-w-0 truncate sm:hidden">{mobileLabel}</span>
-        <span className="hidden min-w-0 truncate sm:inline">{label}</span>
-      </button>
-    );
-  };
 
   return (
-    <main className="min-h-screen">
-      <nav className="no-print sticky top-14 z-20 flex w-full items-center gap-1 border-b border-white/12 bg-[rgba(20,64,118,0.84)] px-1.5 py-1.5 shadow-[0_10px_28px_rgba(20,64,118,0.18)] backdrop-blur-xl sm:px-6">
-        {stepTab("frame", "Select Frame", "Frame", 1)}
-        <span className="flex shrink-0 items-center px-0.5 text-sm text-white/20 sm:px-0 sm:text-lg">›</span>
-        {stepTab("breakers", "Configure Breakers", "Breakers", 2)}
-        <span className="flex shrink-0 items-center px-0.5 text-sm text-white/20 sm:px-0 sm:text-lg">›</span>
-        {stepTab("quote", "Review & Quote", "Quote", 3)}
-      </nav>
+    <>
+      <div className="no-print mx-auto w-full max-w-7xl px-4 py-8 sm:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-3xl font-bold">Siemens Panelboards</h1>
+          <nav className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+            {stepOrder.map((step, index) => {
+              const active = activeStep === step;
+              const done = index < stepIndex;
+              return (
+                <button
+                  key={step}
+                  type="button"
+                  onClick={() => goToStep(step)}
+                  className={`pressable min-h-9 cursor-pointer rounded-md px-4 text-sm font-semibold transition ${
+                    active
+                      ? "bg-primary text-white"
+                      : done
+                        ? "text-primary hover:bg-muted"
+                        : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {stepLabels[step]}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
-      <div className="mx-auto w-full max-w-[1200px] px-3 py-6 sm:px-6 sm:py-8">
         {activeStep === "frame" ? (
-          <section>
+          <section className="mt-6">
             <FrameSelector
               frames={data.frames}
               selectedFrame={data.selectedFrame}
-              savedConfigurations={savedConfigurations}
               onSelectFrame={openFrameConfiguration}
+              onImportFile={(file) => void handleImportFile(file)}
+              importError={importError}
             />
           </section>
         ) : null}
 
-        {activeStep === "breakers" && !breakerStarted ? (
-          <section className="flex min-h-[60vh] items-center justify-center px-1 py-8">
-            <div className="glass-panel scroll-rise grid w-full max-w-[760px] items-center gap-8 rounded-[2rem] p-6 sm:p-10 md:grid-cols-[170px_1fr]">
-              <div className="mx-auto rounded-[1.75rem] bg-[#1f2933] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_18px_38px_rgba(24,48,74,0.18)]">
-                <svg viewBox="0 0 320 900" className="block h-auto w-[120px]">
-                  <rect x="0" y="0" width="320" height="900" fill="#e8e6e2" />
-                  <rect x="8" y="8" width="304" height="884" fill="#d4d1cc" />
-                  <rect x="14" y="14" width="292" height="872" fill="#f0eeeb" />
-                  <rect x="14" y="14" width="292" height="85" fill="#c8c5bf" />
-                  <rect x="30" y="99" width="260" height="116" fill="#1e4882" rx="3" />
-                  {[241, 279].map((y) =>
-                    [18, 163].map((x) => (
-                      <rect key={`${x}-${y}`} x={x} y={y} width="139" height="36" fill="#e2e0db" rx="2" stroke="#c8c5bf" />
-                    )),
-                  )}
-                  {Array.from({ length: 8 }).map((_, row) =>
-                    [18, 163].map((x) => (
-                      <rect key={`${x}-${row}`} x={x} y={333 + row * 50} width="139" height="48" fill="#e2e0db" rx="2" stroke="#c8c5bf" />
-                    )),
-                  )}
-                  <rect x="14" y="733" width="292" height="139" fill="#c8c5bf" />
-                </svg>
-              </div>
-              <div className="text-center md:text-left">
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                  Ready to configure
-                </div>
-                <h2 className="text-2xl font-bold leading-tight text-primary">
-                  {data.selectedFrame.panelType} · {data.selectedFrame.heightInches} in
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {data.selectedFrame.systemVoltage} · {data.selectedFrame.irRating} ·{" "}
-                  {data.selectedFrame.feed} Feed · {data.selectedFrame.mounting} Mount
-                </p>
-                <p className="mt-4 text-sm text-muted-foreground">
-                  {data.slots.length} configurable slots ·{" "}
-                  {data.slots.filter((slot) => slot.breakerFamily === "3VA41").length} top 3VA41 +{" "}
-                  {data.slots.filter((slot) => slot.breakerFamily === "3VA52").length} lower 3VA52
-                </p>
+        {activeStep === "breakers" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+            <div className="relative order-2 lg:order-1">
+              <div className="pointer-events-none absolute right-4 top-4 z-10">
                 <Button
                   type="button"
-                  className="mt-6 w-full px-8 py-3 text-base sm:w-auto"
+                  variant="secondary"
+                  className="pointer-events-auto size-11 p-2"
+                  aria-label={previewMode ? "Zoom to slot" : "View full panel"}
+                  title={previewMode ? "Zoom to slot" : "View full panel"}
+                  onClick={() => setPreviewMode((current) => !current)}
+                >
+                  {previewMode ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                </Button>
+              </div>
+              <PanelboardGraphic
+                data={data}
+                selections={selections}
+                selectedSlotId={selectedSlotId}
+                invalidSlotId={invalidSlotId}
+                previewMode={previewMode}
+                onSelectSlot={chooseSlot}
+              />
+            </div>
+
+            <aside className="card order-1 p-5 lg:order-2 lg:sticky lg:top-6">
+              <h2 className="text-2xl font-bold text-primary">
+                Circuit {selectedSlot?.circuitNumbers.split("/")[0]}
+              </h2>
+
+              {validationMessage ? (
+                <p className="mt-3 rounded-lg border border-accent/60 bg-accent/10 px-3 py-2 text-xs font-semibold text-danger">
+                  {validationMessage}
+                </p>
+              ) : null}
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {allowedBreakers.map((breaker) => (
+                  <button
+                    key={breaker.id}
+                    type="button"
+                    className={`pressable cursor-pointer rounded-lg border px-2 py-3 text-center text-base font-bold transition ${
+                      selectedBreakerId === breaker.id
+                        ? "border-primary bg-primary text-white"
+                        : "border-border bg-card text-foreground hover:border-primary/50"
+                    }`}
+                    onClick={() => chooseBreaker(breaker)}
+                  >
+                    {breaker.amps}A
+                  </button>
+                ))}
+              </div>
+
+              {selectedBreaker ? (
+                <div className="mt-3 flex items-center justify-between rounded-lg bg-muted px-3 py-2">
+                  <span className="text-sm font-bold">{selectedBreaker.amps}A selected</span>
+                  <button
+                    type="button"
+                    className="pressable cursor-pointer rounded-md px-2 py-1 text-xs font-semibold text-danger hover:bg-danger hover:text-white"
+                    onClick={() => chooseBreaker(null, false)}
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={walkIndex === 0}
+                  onClick={() => walkTo(walkIndex - 1)}
+                >
+                  ← Back
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
                   onClick={() => {
-                    setBreakerStarted(true);
-                    setPreviewMode(false);
-                    walkTo(0);
+                    if (walkIndex < data.slots.length - 1) walkTo(walkIndex + 1);
+                    else goToStep("summary");
                   }}
                 >
-                  Get Started →
+                  {walkIndex === data.slots.length - 1
+                    ? "Finish →"
+                    : selectedBreaker
+                      ? "Next →"
+                      : "Skip →"}
                 </Button>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  You will be guided through each slot one at a time.
-                </p>
               </div>
-            </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2 w-full text-danger"
+                onClick={() => setClearOpen(true)}
+              >
+                Clear All
+              </Button>
+            </aside>
           </section>
         ) : null}
 
-        {activeStep === "breakers" && breakerStarted ? (
-          <>
-            <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-              <div className="order-2 lg:order-1 lg:sticky lg:top-28 lg:self-start">
-                <div className="grid content-start items-start gap-3">
-                <div className="liquid-surface rounded-3xl p-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                        Slot Progress
-                      </div>
-                      <div className="mt-0.5 text-sm font-bold">
-                        Slot {walkIndex + 1} of {data.slots.length}
-                      </div>
-                    </div>
-                    <div className="min-w-0 sm:text-right">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                        Configured Amperage
-                      </div>
-                      <div className="mt-0.5 text-sm font-bold">
-                        {selectedAmpTotal}A total
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <div className="mb-1 flex justify-between text-[10px] font-semibold text-muted-foreground">
-                      <span>{filledCount} of {data.slots.length} assigned</span>
-                      <span>{progressPct}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-primary/10">
-                      <div
-                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="relative">
-                  <div className="pointer-events-none sticky top-12 z-10 -mb-30 flex justify-end px-6 pt-18">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="pointer-events-auto size-11 bg-white/88 p-2 shadow-[0_12px_28px_rgba(24,48,74,0.18)] backdrop-blur"
-                      aria-label={previewMode ? "Minimize panel preview" : "Maximize panel preview"}
-                      title={previewMode ? "Back to Slot" : "Preview Full Panel"}
-                      onClick={() => setPreviewMode((current) => !current)}
-                    >
-                      {previewMode ? (
-                        <Minimize2 className="size-4" />
-                      ) : (
-                        <Maximize2 className="size-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <PanelboardGraphic
-                    data={data}
-                    selections={selections}
-                    selectedSlotId={selectedSlotId}
-                    invalidSlotId={invalidSlotId}
-                    previewMode={previewMode}
-                    onSelectSlot={chooseSlot}
-                  />
-                </div>
-                </div>
-              </div>
-
-              <aside className="order-1 lg:order-2 lg:sticky lg:top-44 lg:self-start">
-              <div className="glass-panel rounded-4xl p-4 text-sm">
-                <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                  {selectedSlot?.breakerFamily === "3VA41" ? "Top Zone" : "Lower Zone"}
-                </div>
-                <div className="mt-1 text-[26px] font-bold leading-none text-primary">
-                  Circuit {selectedSlot?.circuitNumbers.split("/")[0]}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {selectedSlot?.breakerFamily} Frame · 3-Pole
-                </div>
-
-                <div className="mt-4 mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-                  Select amperage rating:
-                </div>
-                {validationMessage ? (
-                  <div className="mb-3 rounded border border-orange-200 bg-orange-50 p-2 text-xs font-semibold text-danger">
-                    {validationMessage}
-                  </div>
-                ) : null}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3">
-                  {allowedBreakers.map((breaker) => (
-                    <button
-                      key={breaker.id}
-                      type="button"
-                      className={`pressable cursor-pointer rounded-2xl border-2 px-2 py-3 text-center text-[17px] font-bold transition hover:cursor-pointer hover:border-primary hover:bg-white ${
-                        selectedBreakerId === breaker.id
-                          ? "border-primary bg-[rgba(43,129,191,0.12)] text-primary shadow-[0_10px_24px_rgba(26,83,141,0.12)]"
-                          : "border-gray-200 text-foreground"
-                      }`}
-                      onClick={() => chooseBreaker(breaker)}
-                    >
-                      {breaker.amps}A
-                      <span className="mt-1 block text-[9px] font-normal text-muted-foreground">
-                        3-Pole
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {selectedBreaker ? (
-                  <div className="mt-3 flex items-center gap-3 rounded-2xl border border-[var(--green)] bg-[var(--green-bg)] p-3 shadow-[0_10px_26px_rgba(22,163,117,0.12)]">
-                    <div className="shrink-0 text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--green)]">
-                      Selected
-                    </div>
-                    <div className="flex-1 leading-tight text-[15px] font-bold text-[var(--green)]">
-                      <div>{selectedBreaker.amps}A</div>
-                      <div className="text-[11px] font-semibold">3-Pole</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="pressable cursor-pointer rounded-full border border-danger/30 bg-white px-2 py-1 text-[10px] font-semibold text-danger hover:cursor-pointer hover:bg-danger hover:text-white"
-                      onClick={() => chooseBreaker(null, false)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                ) : null}
-
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="min-h-9 text-xs"
-                    disabled={walkIndex === 0}
-                    onClick={() => walkTo(walkIndex - 1)}
-                  >
-                    ← Back
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="min-h-9 text-xs"
-                    onClick={() => {
-                      if (walkIndex < data.slots.length - 1) walkTo(walkIndex + 1);
-                      else finishConfiguration();
-                    }}
-                  >
-                    {walkIndex === data.slots.length - 1
-                      ? "Finish →"
-                      : selectedBreaker
-                        ? "Next →"
-                        : "Skip →"}
-                  </Button>
-                </div>
-                <div className="mt-4 mb-2 h-2 overflow-hidden rounded-full bg-primary/10">
-                  <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--blue-light),var(--accent))] shadow-[0_0_18px_rgba(43,129,191,0.28)] transition-all duration-500"
-                    style={{ width: `${progressPct}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{filledCount} of {data.slots.length} assigned</span>
-                  <span className="font-semibold text-foreground">{progressPct}%</span>
-                </div>
-
-                <Button type="button" size="sm" variant="outline" className="mt-2 min-h-9 w-full text-xs text-danger" onClick={clearAll}>
-                  Clear all
+        {activeStep === "summary" ? (
+          <section className="mt-6">
+            {!frameSelected ? (
+              <div className="card flex flex-col items-center gap-4 p-12 text-center">
+                <Button type="button" onClick={() => goToStep("frame")}>
+                  Select a Panel Frame
                 </Button>
               </div>
-              </aside>
-            </section>
-          </>
-        ) : null}
-
-        {activeStep === "quote" ? (
-          <section>
-            <h2 className="text-[22px] font-semibold">Configuration Summary</h2>
-            <p className="mt-1 mb-7 text-sm text-muted-foreground">
-              Review your configuration and request verified pricing.
-            </p>
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div>
-                <div className="glass-panel rounded-[2rem] p-6">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Configuration
-                  </div>
-                  <div className="mb-5 break-all rounded-2xl border border-white/70 bg-white/58 px-4 py-3 font-mono text-base font-bold tracking-normal text-primary backdrop-blur">
-                    {data.selectedFrame.catalogNumber}
-                  </div>
-                  <div className="mb-5 rounded-[1.75rem] bg-primary p-5 text-center text-white shadow-[0_18px_40px_rgba(26,83,141,0.24)]">
-                    <div className="mb-1 text-xs text-white/70">Total Price</div>
-                    <div className="select-none text-4xl font-bold tracking-normal blur-[7px]">
-                      {maskedPrice}
-                    </div>
-                    <div className="mt-1 text-[11px] text-white/60">
-                      Hidden until your pricing request is reviewed
-                    </div>
-                  </div>
-                  <div className="mb-5 rounded-3xl border border-white/70 bg-white/62 p-4 backdrop-blur">
-                    {!frameSelected ? (
-                      <div className="space-y-3 text-center">
-                        <p className="text-xs font-semibold text-danger">
-                          Select a frame size before requesting pricing.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="w-full"
-                          onClick={() => goToStep("frame")}
-                        >
-                          Select frame size
-                        </Button>
-                      </div>
-                    ) : canRequestPricing ? (
-                      <RequestPricingButton
-                        frameId={data.selectedFrame.id}
-                        selections={selections}
-                      />
-                    ) : (
-                      <PricingGateActions
-                        pricingAccess={pricingAccess}
-                        returnUrl={quoteReturnUrl}
-                        onBeforeAuth={persistReviewState}
-                      />
-                    )}
-                  </div>
-                  <div className="text-xs leading-6 text-muted-foreground">
-                    <strong className="text-foreground">
-                      {data.selectedFrame.panelType} · {data.selectedFrame.heightInches} in
-                    </strong>
-                    <br />
-                    {filledCount} of {data.slots.length} slots populated ·{" "}
-                    {data.slots.length - filledCount} cover plates
-                    <br />
-                    {data.selectedFrame.systemVoltage} · 65 KAIC · {data.selectedFrame.mainBusAmps}A Main
-                  </div>
+            ) : (
+              <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+                <PanelboardGraphic
+                  data={data}
+                  selections={selections}
+                  selectedSlotId={null}
+                  previewMode
+                  completed
+                  svgRef={finishedPanelSvgRef}
+                  onSelectSlot={() => undefined}
+                />
+                <div className="grid gap-4">
+                  <ModelNumberCard model={data.selectedFrame.catalogNumber} />
+                  <ActionBar
+                    baseName="panelboard"
+                    exportPayload={() => buildPanelboardExport(data, selections)}
+                    onImport={handleImportPayload}
+                    svgRef={finishedPanelSvgRef}
+                    imageSize={{ width: 960, height: 2700 }}
+                    bomLines={bom.lines.map((line) => ({
+                      quantity: line.quantity,
+                      catalogNumber: line.catalogNumber,
+                      description: line.description,
+                    }))}
+                    modelNumber={data.selectedFrame.catalogNumber}
+                  />
+                  <SpecDetails specs={specs} />
+                  <BomTable
+                    lines={bom.lines.map((line) => ({
+                      quantity: line.quantity,
+                      catalogNumber: line.catalogNumber,
+                      description: line.description,
+                    }))}
+                  />
                 </div>
-                <div className="mt-5 grid gap-2 text-sm sm:grid-cols-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setSaveOpen(true)}
-                  >
-                    <Save className="size-4" /> Save configuration
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="w-full"
-                    disabled={imageDownloadState === "downloading"}
-                    onClick={downloadPanelImage}
-                  >
-                    <Download className="size-4" />
-                    {imageDownloadState === "downloading"
-                      ? "Preparing image…"
-                      : "Download panel image"}
-                  </Button>
-                </div>
-                {imageDownloadState === "error" ? (
-                  <p role="alert" className="mt-2 text-center text-xs font-semibold text-danger">
-                    The panel image could not be created. Please try again.
-                  </p>
-                ) : null}
               </div>
-              <div className="grid gap-5">
-                <LiveBom bom={bom} />
-                <ConfigurationSummary data={data} />
-              </div>
-            </div>
+            )}
           </section>
         ) : null}
       </div>
 
-      {activeStep === "quote" ? (
-        <div className="hidden" aria-hidden="true">
-          <PanelboardGraphic
-            data={data}
-            selections={selections}
-            selectedSlotId={null}
-            previewMode
-            completed
-            svgRef={finishedPanelSvgRef}
-            onSelectSlot={() => undefined}
-          />
-        </div>
+      {activeStep === "summary" && frameSelected ? (
+        <PrintSheet
+          title="Siemens Panelboard"
+          modelNumber={data.selectedFrame.catalogNumber}
+          specs={specs}
+          bomLines={bom.lines.map((line) => ({
+            quantity: line.quantity,
+            catalogNumber: line.catalogNumber,
+            description: line.description,
+          }))}
+        />
       ) : null}
 
-      <SaveConfigurationDialog
-        open={saveOpen}
-        onOpenChange={setSaveOpen}
-        data={data}
-        selections={selections}
-      />
       <Dialog open={clearOpen} onOpenChange={setClearOpen}>
-        <DialogContent className="max-w-xl rounded-[2rem] bg-white/80 px-6 pb-8 pt-14 text-center sm:px-10">
-          <DialogHeader className="mx-auto mb-7 max-w-md pr-0">
-            <DialogTitle>Clear breaker selections?</DialogTitle>
-            <DialogDescription>
-              This will remove every selected breaker. Empty slots will keep
-              cover plates in the quote.
-            </DialogDescription>
+        <DialogContent className="max-w-md rounded-xl bg-card p-6 text-center">
+          <DialogHeader className="mx-auto mb-5 pr-0">
+            <DialogTitle>Clear all breaker selections?</DialogTitle>
+            <DialogDescription />
           </DialogHeader>
           <div className="flex flex-col-reverse items-stretch justify-center gap-3 sm:flex-row sm:items-center">
             <Button
               type="button"
               variant="secondary"
-              className="min-w-36"
+              className="min-w-32"
               onClick={() => setClearOpen(false)}
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              variant="danger"
-              className="min-w-36"
-              onClick={confirmClearAll}
-            >
-              Clear all
+            <Button type="button" variant="danger" className="min-w-32" onClick={confirmClearAll}>
+              Clear All
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-    </main>
+    </>
   );
 }

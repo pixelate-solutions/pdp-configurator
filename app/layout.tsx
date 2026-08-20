@@ -1,30 +1,34 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
-import { AppNavbar } from "@/components/AppNavbar";
-import { isClerkConfigured } from "@/lib/clerk-config";
+import { Open_Sans, Titillium_Web } from "next/font/google";
+import { AppSidebar } from "@/components/AppSidebar";
 import "./globals.css";
 
+const openSans = Open_Sans({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-body",
+});
+
+const titillium = Titillium_Web({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-display",
+});
+
 export const metadata: Metadata = {
-  title: "Electro-Matic PDP Configurator",
-  description: "Configure Siemens P5 panelboards and generate sellable BOMs.",
+  title: "Electro-Matic Configurators",
+  description:
+    "Configure Electro-Matic power distribution products: panelboards, PDPs, PDUs, RPPs, and CDUs.",
 };
-
-function OptionalClerkProvider({ children }: { children: React.ReactNode }) {
-  if (!isClerkConfigured()) {
-    return <>{children}</>;
-  }
-
-  return <ClerkProvider>{children}</ClerkProvider>;
-}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${openSans.variable} ${titillium.variable}`}>
       <body>
-        <OptionalClerkProvider>
-          <AppNavbar />
-          {children}
-        </OptionalClerkProvider>
+        <div className="flex min-h-screen flex-col lg:flex-row">
+          <AppSidebar />
+          <main className="min-w-0 flex-1">{children}</main>
+        </div>
       </body>
     </html>
   );

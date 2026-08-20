@@ -136,17 +136,12 @@ export function PanelboardGraphic({
     : viewBox;
 
   return (
-    <section className="glass-panel overflow-hidden rounded-[2rem]">
-      <div className="flex items-center justify-between gap-3 border-b border-white/18 bg-primary/92 px-5 py-3.5 text-white backdrop-blur">
-        <div className="min-w-0">
-          <div className="truncate text-[13px] font-bold">
-            {data.selectedFrame.panelType} · {data.selectedFrame.heightInches} in
-          </div>
-          <div className="truncate text-xs text-white/70">
-            {data.selectedFrame.systemVoltage} · {data.selectedFrame.irRating}
-          </div>
+    <section className="card overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-primary px-5 py-3 text-white">
+        <div className="min-w-0 truncate text-[13px] font-bold">
+          {data.selectedFrame.panelType} · {data.selectedFrame.heightInches} in
         </div>
-        <div className="shrink-0 text-[11px] text-white/60">
+        <div className="shrink-0 text-[11px] text-white/70">
           {data.selectedFrame.catalogNumber}
         </div>
       </div>

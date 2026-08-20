@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { getAdminCatalog } from "@/lib/db/queries";
-import { currency } from "@/lib/utils";
 import { updateDefaultMarginAction } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,13 +12,7 @@ export default async function AdminDashboardPage() {
     ["Breaker options", catalog.breakerOptions.length, "/admin/breakers"],
     ["Accessories", catalog.accessories.length, "/admin/accessories"],
     ["Cover plates", catalog.coverPlates.length, "/admin/cover-plates"],
-    ["Saved configurations", catalog.configurations.length, "/admin/configurations"],
   ] as const;
-
-  const quotedTotal = catalog.configurations.reduce(
-    (sum, item) => sum + Number(item.totalSellPrice ?? 0),
-    0,
-  );
 
   return (
     <div className="grid gap-5">
@@ -60,17 +53,6 @@ export default async function AdminDashboardPage() {
           </form>
           <p className="mt-1 text-sm text-muted-foreground">
             Customer price is calculated from Electro-Matic cost using this margin.
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Quote pipeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-semibold">{currency(quotedTotal)}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Total sell price across saved configurations.
           </p>
         </CardContent>
       </Card>
